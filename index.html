@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Симулятор холодных звонков</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background-color: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+        }
+        button {
+            margin: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #dialog {
+            width: 100%;
+            max-width: 400px;
+            margin-top: 20px;
+            border: 1px solid var(--tg-theme-hint-color, #999999);
+            padding: 10px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Симулятор холодных звонков</h1>
+    <button id="startCall">Начать звонок</button>
+    <button id="endCall" style="display: none;">Завершить звонок</button>
+    <div id="dialog"></div>
+
+    <script>
+        let tg = window.Telegram.WebApp;
+        let startCallBtn = document.getElementById('startCall');
+        let endCallBtn = document.getElementById('endCall');
+        let dialogDiv = document.getElementById('dialog');
+        let startTime;
+
+        tg.expand();
+
+        startCallBtn.addEventListener('click', function() {
+            startTime = new Date();
+            dialogDiv.innerHTML = '<p>Клиент: Алло, слушаю.</p>';
+            startCallBtn.style.display = 'none';
+            endCallBtn.style.display = 'inline-block';
+        });
+
+        endCallBtn.addEventListener('click', function() {
+            let duration = (new Date() - startTime) / 1000;
+            let result = {
+                duration: duration,
+                score: Math.floor(Math.random() * 5) + 1,
+                comment: "Это тестовый комментарий к звонку."
+            };
+            tg.sendData(JSON.stringify(result));
+            tg.close();
+        });
+
+        tg.ready();
+    </script>
+</body>
+</html>
