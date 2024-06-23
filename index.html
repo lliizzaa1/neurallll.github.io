@@ -61,6 +61,7 @@
 
     <script>
         async function validateTelegramWebAppData(data) {
+            console.log('Sending validation request with data:', data);
             try {
                 const response = await fetch('http://127.0.0.1:5000/validate', {  // Укажите URL вашего локального сервера
                     method: 'POST',
@@ -70,6 +71,7 @@
                     body: JSON.stringify(data)
                 });
                 const result = await response.json();
+                console.log('Validation response:', result);
                 return result.valid;
             } catch (error) {
                 console.error('Error:', error);
@@ -79,6 +81,7 @@
 
         async function initApp() {
             let tg = window.Telegram.WebApp;
+            console.log('Telegram WebApp initData:', tg.initData);
             if (await validateTelegramWebAppData(tg.initData)) {
                 document.getElementById('content').style.display = 'block';
                 // Инициализация вашего приложения
@@ -235,6 +238,7 @@
 
                 tg.ready();
             } else {
+                console.log('Validation failed');
                 document.getElementById('error').style.display = 'block';
             }
         }
