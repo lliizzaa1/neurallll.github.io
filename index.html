@@ -49,9 +49,14 @@
     </style>
 </head>
 <body>
-    <div id="phone">
-        <div id="display"></div>
-        <button id="callButton">Начать звонок</button>
+    <div id="content" style="display: none;">
+        <div id="phone">
+            <div id="display"></div>
+            <button id="callButton">Начать звонок</button>
+        </div>
+    </div>
+    <div id="error" style="display: none;">
+        <p>Доступ запрещен. Пожалуйста, откройте эту страницу через Telegram.</p>
     </div>
 
     <script>
@@ -63,9 +68,34 @@
         let silenceDetector;
         let isCallActive = false;
 
-        tg.expand();
+        function validateTelegramWebAppData(data) {
+            return fetch('/validate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => result.valid)
+            .catch(error => {
+                console.error('Error:', error);
+                return false;
+            });
+        }
 
-        callButton.addEventListener('click', toggleCall);
+        async function initApp() {
+            if (await validateTelegramWebAppData(tg.initData)) {
+                document.getElementById('content').style.display = 'block';
+                tg.expand();
+                callButton.addEventListener('click', toggleCall);
+                tg.ready();
+            } else {
+                document.getElementById('error').style.display = 'block';
+            }
+        }
+
+        initApp();
 
         function toggleCall() {
             if (isCallActive) {
@@ -130,9 +160,8 @@
             .then(response => response.json())
             .then(data => {
                 display.innerHTML += `<p>Ответ: ${data.response}</p>`;
-                // Здесь можно добавить воспроизведение аудио-ответа
                 if (isCallActive) {
-                    startCall(); // Продолжаем запись после получения ответа
+                    startCall();
                 }
             })
             .catch(error => {
@@ -185,7 +214,7 @@
                     } else {
                         if (this.timeout) {
                             clearTimeout(this.timeout);
-                            this.timeout = null;
+                            this.timeout =null;
                         }
                     }
 
@@ -206,8 +235,6 @@
                 }
             }
         }
-
-        tg.ready();
     </script>
 </body>
 </html>
