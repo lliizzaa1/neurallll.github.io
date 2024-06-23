@@ -9,14 +9,35 @@
         body {
             font-family: Arial, sans-serif;
             display: flex;
-            flex-direction: column;
+            justify-content: center;
             align-items: center;
-            padding: 20px;
+            height: 100vh;
+            margin: 0;
             background-color: var(--tg-theme-bg-color, #ffffff);
             color: var(--tg-theme-text-color, #000000);
         }
+        #phone {
+            width: 300px;
+            height: 600px;
+            border: 2px solid black;
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        #display {
+            width: 100%;
+            height: 400px;
+            background-color: white;
+            border: 1px solid #ccc;
+            overflow-y: auto;
+            padding: 10px;
+            margin-bottom: 20px;
+        }
         button {
-            margin: 10px;
             padding: 10px 20px;
             font-size: 16px;
             background-color: var(--tg-theme-button-color, #3390ec);
@@ -25,53 +46,40 @@
             border-radius: 5px;
             cursor: pointer;
         }
-        #status {
-            margin-top: 20px;
-            font-weight: bold;
-        }
     </style>
 </head>
 <body>
-    <h1>Симулятор звонка</h1>
-    <button id="startCall">Начать звонок</button>
-    <button id="endCall" style="display: none;">Завершить звонок</button>
-    <button id="startRecording" style="display: none;">Начать запись</button>
-    <button id="stopRecording" style="display: none;">Остановить запись</button>
-    <div id="status"></div>
+    <div id="phone">
+        <div id="display"></div>
+        <button id="callButton">Начать звонок</button>
+    </div>
 
     <script>
         let tg = window.Telegram.WebApp;
-        let startCallBtn = document.getElementById('startCall');
-        let endCallBtn = document.getElementById('endCall');
-        let startRecordingBtn = document.getElementById('startRecording');
-        let stopRecordingBtn = document.getElementById('stopRecording');
-        let statusDiv = document.getElementById('status');
+        let callButton = document.getElementById('callButton');
+        let display = document.getElementById('display');
         let mediaRecorder;
         let audioChunks = [];
+        let silenceDetector;
+        let isCallActive = false;
 
         tg.expand();
 
-        startCallBtn.addEventListener('click', startCall);
-        endCallBtn.addEventListener('click', endCall);
-        startRecordingBtn.addEventListener('click', startRecording);
-        stopRecordingBtn.addEventListener('click', stopRecording);
+        callButton.addEventListener('click', toggleCall);
 
-        function startCall() {
-            startCallBtn.style.display = 'none';
-            endCallBtn.style.display = 'inline-block';
-            startRecordingBtn.style.display = 'inline-block';
-            statusDiv.textContent = 'Звонок начат. Нажмите "Начать запись" для записи вашего голоса.';
+        function toggleCall() {
+            if (isCallActive) {
+                endCall();
+            } else {
+                startCall();
+            }
         }
 
-        function endCall() {
-            tg.sendData(JSON.stringify({ status: 'call_ended' }));
-            tg.close();
-        }
-
-        async function startRecording() {
+        async function startCall() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
                 mediaRecorder = new MediaRecorder(stream);
+                silenceDetector = new SilenceDetector(stream, onSilenceDetected);
 
                 mediaRecorder.ondataavailable = (event) => {
                     audioChunks.push(event.data);
@@ -80,21 +88,33 @@
                 mediaRecorder.onstop = sendAudioToServer;
 
                 mediaRecorder.start();
-                startRecordingBtn.style.display = 'none';
-                stopRecordingBtn.style.display = 'inline-block';
-                statusDiv.textContent = 'Запись начата...';
+                silenceDetector.start();
+                isCallActive = true;
+                callButton.textContent = 'Завершить звонок';
+                display.innerHTML += '<p>Звонок начат. Говорите...</p>';
             } catch (err) {
                 console.error('Error accessing microphone:', err);
-                statusDiv.textContent = 'Ошибка доступа к микрофону';
+                display.innerHTML += '<p>Ошибка доступа к микрофону</p>';
             }
         }
 
-        function stopRecording() {
+        function endCall() {
             if (mediaRecorder && mediaRecorder.state !== 'inactive') {
                 mediaRecorder.stop();
-                stopRecordingBtn.style.display = 'none';
-                startRecordingBtn.style.display = 'inline-block';
-                statusDiv.textContent = 'Запись остановлена. Отправка на сервер...';
+            }
+            if (silenceDetector) {
+                silenceDetector.stop();
+            }
+            isCallActive = false;
+            callButton.textContent = 'Начать звонок';
+            display.innerHTML += '<p>Звонок завершен</p>';
+        }
+
+        function onSilenceDetected() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                silenceDetector.stop();
+                display.innerHTML += '<p>Тишина обнаружена. Отправка аудио...</p>';
             }
         }
 
@@ -103,21 +123,88 @@
             const formData = new FormData();
             formData.append('audio', audioBlob, 'recording.webm');
 
-            fetch('/process_audio', {
+            fetch('http://127.0.0.1:5000/process_audio', {
                 method: 'POST',
                 body: formData
             })
             .then(response => response.json())
             .then(data => {
-                statusDiv.textContent = `Ответ сервера: ${data.response}`;
-                // Здесь можно добавить логику воспроизведения ответа
+                display.innerHTML += `<p>Ответ: ${data.response}</p>`;
+                // Здесь можно добавить воспроизведение аудио-ответа
+                if (isCallActive) {
+                    startCall(); // Продолжаем запись после получения ответа
+                }
             })
             .catch(error => {
                 console.error('Error:', error);
-                statusDiv.textContent = 'Ошибка при отправке аудио';
+                display.innerHTML += '<p>Ошибка при отправке аудио</p>';
             });
 
             audioChunks = [];
+        }
+
+        class SilenceDetector {
+            constructor(stream, callback, silenceThreshold = -50, silenceDuration = 1500) {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                this.stream = stream;
+                this.callback = callback;
+                this.silenceThreshold = silenceThreshold;
+                this.silenceDuration = silenceDuration;
+                this.timeout = null;
+            }
+
+            start() {
+                const source = this.audioContext.createMediaStreamSource(this.stream);
+                this.analyser = this.audioContext.createAnalyser();
+                this.analyser.fftSize = 2048;
+                source.connect(this.analyser);
+
+                this.processAudio();
+            }
+
+            processAudio() {
+                const bufferLength = this.analyser.fftSize;
+                const dataArray = new Uint8Array(bufferLength);
+
+                const checkAudio = () => {
+                    this.analyser.getByteTimeDomainData(dataArray);
+                    let sum = 0;
+                    for (let i = 0; i < bufferLength; i++) {
+                        const amplitude = (dataArray[i] - 128) / 128;
+                        sum += amplitude * amplitude;
+                    }
+                    const rms = Math.sqrt(sum / bufferLength);
+                    const db = 20 * Math.log10(rms);
+
+                    if (db < this.silenceThreshold) {
+                        if (!this.timeout) {
+                            this.timeout = setTimeout(() => {
+                                this.callback();
+                            }, this.silenceDuration);
+                        }
+                    } else {
+                        if (this.timeout) {
+                            clearTimeout(this.timeout);
+                            this.timeout = null;
+                        }
+                    }
+
+                    if (this.isRunning) {
+                        requestAnimationFrame(checkAudio);
+                    }
+                };
+
+                this.isRunning = true;
+                checkAudio();
+            }
+
+            stop() {
+                this.isRunning = false;
+                if (this.timeout) {
+                    clearTimeout(this.timeout);
+                    this.timeout = null;
+                }
+            }
         }
 
         tg.ready();
