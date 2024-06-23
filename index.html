@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Симулятор холодных звонков</title>
+    <title>Симулятор звонка</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body {
@@ -25,48 +25,100 @@
             border-radius: 5px;
             cursor: pointer;
         }
-        #dialog {
-            width: 100%;
-            max-width: 400px;
+        #status {
             margin-top: 20px;
-            border: 1px solid var(--tg-theme-hint-color, #999999);
-            padding: 10px;
-            border-radius: 5px;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
-    <h1>Симулятор холодных звонков</h1>
+    <h1>Симулятор звонка</h1>
     <button id="startCall">Начать звонок</button>
     <button id="endCall" style="display: none;">Завершить звонок</button>
-    <div id="dialog"></div>
+    <button id="startRecording" style="display: none;">Начать запись</button>
+    <button id="stopRecording" style="display: none;">Остановить запись</button>
+    <div id="status"></div>
 
     <script>
         let tg = window.Telegram.WebApp;
         let startCallBtn = document.getElementById('startCall');
         let endCallBtn = document.getElementById('endCall');
-        let dialogDiv = document.getElementById('dialog');
-        let startTime;
+        let startRecordingBtn = document.getElementById('startRecording');
+        let stopRecordingBtn = document.getElementById('stopRecording');
+        let statusDiv = document.getElementById('status');
+        let mediaRecorder;
+        let audioChunks = [];
 
         tg.expand();
 
-        startCallBtn.addEventListener('click', function() {
-            startTime = new Date();
-            dialogDiv.innerHTML = '<p>Клиент: Алло, слушаю.</p>';
+        startCallBtn.addEventListener('click', startCall);
+        endCallBtn.addEventListener('click', endCall);
+        startRecordingBtn.addEventListener('click', startRecording);
+        stopRecordingBtn.addEventListener('click', stopRecording);
+
+        function startCall() {
             startCallBtn.style.display = 'none';
             endCallBtn.style.display = 'inline-block';
-        });
+            startRecordingBtn.style.display = 'inline-block';
+            statusDiv.textContent = 'Звонок начат. Нажмите "Начать запись" для записи вашего голоса.';
+        }
 
-        endCallBtn.addEventListener('click', function() {
-            let duration = (new Date() - startTime) / 1000;
-            let result = {
-                duration: duration,
-                score: Math.floor(Math.random() * 5) + 1,
-                comment: "Это тестовый комментарий к звонку."
-            };
-            tg.sendData(JSON.stringify(result));
+        function endCall() {
+            tg.sendData(JSON.stringify({ status: 'call_ended' }));
             tg.close();
-        });
+        }
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = sendAudioToServer;
+
+                mediaRecorder.start();
+                startRecordingBtn.style.display = 'none';
+                stopRecordingBtn.style.display = 'inline-block';
+                statusDiv.textContent = 'Запись начата...';
+            } catch (err) {
+                console.error('Error accessing microphone:', err);
+                statusDiv.textContent = 'Ошибка доступа к микрофону';
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                stopRecordingBtn.style.display = 'none';
+                startRecordingBtn.style.display = 'inline-block';
+                statusDiv.textContent = 'Запись остановлена. Отправка на сервер...';
+            }
+        }
+
+        function sendAudioToServer() {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'recording.webm');
+
+            fetch('/process_audio', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                statusDiv.textContent = `Ответ сервера: ${data.response}`;
+                // Здесь можно добавить логику воспроизведения ответа
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                statusDiv.textContent = 'Ошибка при отправке аудио';
+            });
+
+            audioChunks = [];
+        }
 
         tg.ready();
     </script>
