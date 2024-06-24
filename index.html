@@ -62,6 +62,9 @@
             let isCallActive = false;
             let intervalId;
 
+            console.log('WebApp data:', tg.initDataUnsafe);
+            console.log('Is Telegram WebApp:', tg.initDataUnsafe.query_id !== undefined);
+
             tg.expand();
 
             callButton.addEventListener('click', toggleCall);
@@ -79,6 +82,7 @@
                 callButton.textContent = 'Завершить звонок';
                 display.innerHTML += '<p>Звонок начат.</p>';
                 intervalId = setInterval(getResponse, 1000);
+                tg.showAlert("Звонок начат");
             }
 
             function endCall() {
@@ -86,21 +90,42 @@
                 callButton.textContent = 'Начать звонок';
                 display.innerHTML += '<p>Звонок завершен</p>';
                 clearInterval(intervalId);
+                tg.showAlert("Звонок завершен");
             }
 
             function getResponse() {
-                fetch('http://localhost:5000/get_response')
+                tg.showAlert("Attempting to get response...");
+                fetch('https://your-server.com/get_response')
                     .then(response => response.json())
                     .then(data => {
+                        tg.showAlert("Response received: " + data.response);
                         display.innerHTML += `<p>Собеседник: ${data.response}</p>`;
                         display.scrollTop = display.scrollHeight;
                     })
                     .catch(error => {
+                        tg.showAlert("Error: " + error.message);
                         console.error('Error:', error);
                         display.innerHTML += '<p>Ошибка при получении ответа</p>';
                     });
             }
 
+            function testServer() {
+                tg.showAlert("Testing server connection...");
+                fetch('https://your-server.com/test')
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Server test:', data);
+                        tg.showAlert("Server test: " + data.message);
+                        display.innerHTML += `<p>Тест сервера: ${data.message}</p>`;
+                    })
+                    .catch(error => {
+                        console.error('Server test error:', error);
+                        tg.showAlert("Server test error: " + error.message);
+                        display.innerHTML += '<p>Ошибка при тестировании сервера</p>';
+                    });
+            }
+
+            testServer();
             tg.ready();
         }
 
