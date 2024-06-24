@@ -167,10 +167,16 @@
                 })
                 .then(response => {
                     console.log('Server response:', response);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
                     return response.json();
                 })
                 .then(data => {
                     console.log('Parsed data:', data);
+                    if (data.error) {
+                        throw new Error(`Server error: ${data.error}`);
+                    }
                     addMessage('Вы: ' + data.user_speech, 'user');
                     addMessage(data.bot_response, 'response');
                 })
