@@ -96,6 +96,8 @@
             let display = document.getElementById('display');
             let isCallActive = false;
             let isTelegramWebApp = tg.initDataUnsafe.query_id !== undefined;
+            let mediaRecorder;
+            let audioChunks = [];
 
             console.log('Is Telegram WebApp:', isTelegramWebApp);
             logMessage('App initialized. Is Telegram WebApp: ' + isTelegramWebApp);
@@ -112,17 +114,35 @@
                 }
             }
 
-            function startCall() {
-                isCallActive = true;
-                callButton.textContent = 'Завершить звонок';
-                addMessage('Звонок начат. Говорите...', 'system');
-                logMessage('Call started');
-                if (isTelegramWebApp) {
-                    tg.sendData(JSON.stringify({action: 'startCall'}));
+            async function startCall() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    
+                    mediaRecorder.ondataavailable = (event) => {
+                        audioChunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = sendAudioToServer;
+
+                    mediaRecorder.start();
+                    isCallActive = true;
+                    callButton.textContent = 'Завершить звонок';
+                    addMessage('Звонок начат. Говорите...', 'system');
+                    logMessage('Call started');
+                    if (isTelegramWebApp) {
+                        tg.sendData(JSON.stringify({action: 'startCall'}));
+                    }
+                } catch (err) {
+                    console.error('Error accessing microphone:', err);
+                    addMessage('Ошибка доступа к микрофону', 'error');
                 }
             }
 
             function endCall() {
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                }
                 isCallActive = false;
                 callButton.textContent = 'Начать звонок';
                 addMessage('Звонок завершен', 'system');
@@ -130,6 +150,28 @@
                 if (isTelegramWebApp) {
                     tg.sendData(JSON.stringify({action: 'endCall'}));
                 }
+            }
+
+            function sendAudioToServer() {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                audioChunks = [];
+
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.webm');
+
+                fetch('/recognize_speech', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    addMessage('Вы: ' + data.user_speech, 'user');
+                    addMessage(data.bot_response, 'response');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    addMessage('Ошибка распознавания речи', 'error');
+                });
             }
 
             function addMessage(message, type) {
@@ -146,14 +188,6 @@
                     tg.sendData(JSON.stringify({action: 'log', message: message}));
                 }
             }
-
-            tg.onEvent('message', function(event) {
-                if (event.data.type === 'userSpeech') {
-                    addMessage('Вы: ' + event.data.text, 'user');
-                } else if (event.data.type === 'botResponse') {
-                    addMessage(event.data.text, 'response');
-                }
-            });
 
             tg.ready();
         }
