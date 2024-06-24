@@ -153,7 +153,7 @@
             }
 
             function sendAudioToServer() {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
                 audioChunks = [];
             
                 const formData = new FormData();
