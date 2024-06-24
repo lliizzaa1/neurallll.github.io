@@ -57,6 +57,11 @@
             color: var(--tg-theme-button-text-color, #ffffff);
             align-self: flex-start;
         }
+        #display p.user {
+            background-color: var(--tg-theme-secondary-bg-color, #e6e6e6);
+            align-self: flex-end;
+            text-align: right;
+        }
         #display p.error {
             background-color: #ff4d4d;
             color: white;
@@ -90,7 +95,6 @@
             let callButton = document.getElementById('callButton');
             let display = document.getElementById('display');
             let isCallActive = false;
-            let intervalId;
             let isTelegramWebApp = tg.initDataUnsafe.query_id !== undefined;
 
             console.log('Is Telegram WebApp:', isTelegramWebApp);
@@ -111,8 +115,7 @@
             function startCall() {
                 isCallActive = true;
                 callButton.textContent = 'Завершить звонок';
-                addMessage('Звонок начат.', 'system');
-                intervalId = setInterval(getResponse, 3000);
+                addMessage('Звонок начат. Говорите...', 'system');
                 logMessage('Call started');
                 if (isTelegramWebApp) {
                     tg.sendData(JSON.stringify({action: 'startCall'}));
@@ -123,32 +126,9 @@
                 isCallActive = false;
                 callButton.textContent = 'Начать звонок';
                 addMessage('Звонок завершен', 'system');
-                clearInterval(intervalId);
                 logMessage('Call ended');
                 if (isTelegramWebApp) {
                     tg.sendData(JSON.stringify({action: 'endCall'}));
-                }
-            }
-
-            function getResponse() {
-                let responses = [
-                    "Здравствуйте, чем могу помочь?",
-                    "Интересно, расскажите подробнее.",
-                    "А какие преимущества у вашего предложения?",
-                    "Сколько это будет стоить?",
-                    "Звучит неплохо, но мне нужно подумать.",
-                    "У нас уже есть поставщик. Чем ваше предложение лучше?",
-                    "Отправьте, пожалуйста, информацию на email.",
-                    "Я не принимаю решения по таким вопросам. Обратитесь к моему руководителю.",
-                    "Спасибо за информацию, я подумаю над вашим предложением.",
-                    "Хорошо, давайте созвонимся на следующей неделе.",
-                    "Извините, но мне это не интересно. Всего доброго.",
-                ];
-                let response = responses[Math.floor(Math.random() * responses.length)];
-                addMessage(response, 'response');
-                logMessage('Response generated: ' + response);
-                if (isTelegramWebApp) {
-                    tg.sendData(JSON.stringify({action: 'response', text: response}));
                 }
             }
 
@@ -166,6 +146,14 @@
                     tg.sendData(JSON.stringify({action: 'log', message: message}));
                 }
             }
+
+            tg.onEvent('message', function(event) {
+                if (event.data.type === 'userSpeech') {
+                    addMessage('Вы: ' + event.data.text, 'user');
+                } else if (event.data.type === 'botResponse') {
+                    addMessage(event.data.text, 'response');
+                }
+            });
 
             tg.ready();
         }
