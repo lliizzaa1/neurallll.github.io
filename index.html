@@ -49,198 +49,166 @@
     </style>
 </head>
 <body>
-    <div id="content" style="display: none;">
-        <div id="phone">
-            <div id="display"></div>
-            <button id="callButton">Начать звонок</button>
-        </div>
-    </div>
-    <div id="error" style="display: none;">
-        <p>Доступ запрещен. Пожалуйста, откройте эту страницу через Telegram.</p>
+    <div id="phone">
+        <div id="display"></div>
+        <button id="callButton">Начать звонок</button>
     </div>
 
     <script>
-        async function validateTelegramWebAppData(data) {
-            console.log('Sending validation request with data:', data);
-            try {
-                const response = await fetch('http://127.0.0.1:5000/validate', {  // Укажите URL вашего локального сервера
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data)
-                });
-                const result = await response.json();
-                console.log('Validation response:', result);
-                return result.valid;
-            } catch (error) {
-                console.error('Error:', error);
-                return false;
-            }
-        }
-
-        async function initApp() {
+        function initApp() {
             let tg = window.Telegram.WebApp;
-            console.log('Telegram WebApp initData:', tg.initData);
-            if (await validateTelegramWebAppData(tg.initData)) {
-                document.getElementById('content').style.display = 'block';
-                // Инициализация вашего приложения
-                let callButton = document.getElementById('callButton');
-                let display = document.getElementById('display');
-                let mediaRecorder;
-                let audioChunks = [];
-                let silenceDetector;
-                let isCallActive = false;
+            let callButton = document.getElementById('callButton');
+            let display = document.getElementById('display');
+            let mediaRecorder;
+            let audioChunks = [];
+            let silenceDetector;
+            let isCallActive = false;
 
-                tg.expand();
+            tg.expand();
 
-                callButton.addEventListener('click', toggleCall);
+            callButton.addEventListener('click', toggleCall);
 
-                function toggleCall() {
+            function toggleCall() {
+                if (isCallActive) {
+                    endCall();
+                } else {
+                    startCall();
+                }
+            }
+
+            async function startCall() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    silenceDetector = new SilenceDetector(stream, onSilenceDetected);
+
+                    mediaRecorder.ondataavailable = (event) => {
+                        audioChunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = sendAudioToServer;
+
+                    mediaRecorder.start();
+                    silenceDetector.start();
+                    isCallActive = true;
+                    callButton.textContent = 'Завершить звонок';
+                    display.innerHTML += '<p>Звонок начат. Говорите...</p>';
+                } catch (err) {
+                    console.error('Error accessing microphone:', err);
+                    display.innerHTML += '<p>Ошибка доступа к микрофону</p>';
+                }
+            }
+
+            function endCall() {
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                }
+                if (silenceDetector) {
+                    silenceDetector.stop();
+                }
+                isCallActive = false;
+                callButton.textContent = 'Начать звонок';
+                display.innerHTML += '<p>Звонок завершен</p>';
+            }
+
+            function onSilenceDetected() {
+                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                    mediaRecorder.stop();
+                    silenceDetector.stop();
+                    display.innerHTML += '<p>Тишина обнаружена. Отправка аудио...</p>';
+                }
+            }
+
+            function sendAudioToServer() {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.webm');
+
+                fetch('http://127.0.0.1:5000/process_audio', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    display.innerHTML += `<p>Ответ: ${data.response}</p>`;
+                    // Здесь можно добавить воспроизведение аудио-ответа
                     if (isCallActive) {
-                        endCall();
-                    } else {
-                        startCall();
+                        startCall(); // Продолжаем запись после получения ответа
                     }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    display.innerHTML += '<p>Ошибка при отправке аудио</p>';
+                });
+
+                audioChunks = [];
+            }
+
+            class SilenceDetector {
+                constructor(stream, callback, silenceThreshold = -50, silenceDuration = 1500) {
+                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    this.stream = stream;
+                    this.callback = callback;
+                    this.silenceThreshold = silenceThreshold;
+                    this.silenceDuration = silenceDuration;
+                    this.timeout = null;
                 }
 
-                async function startCall() {
-                    try {
-                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                        mediaRecorder = new MediaRecorder(stream);
-                        silenceDetector = new SilenceDetector(stream, onSilenceDetected);
+                start() {
+                    const source = this.audioContext.createMediaStreamSource(this.stream);
+                    this.analyser = this.audioContext.createAnalyser();
+                    this.analyser.fftSize = 2048;
+                    source.connect(this.analyser);
 
-                        mediaRecorder.ondataavailable = (event) => {
-                            audioChunks.push(event.data);
-                        };
-
-                        mediaRecorder.onstop = sendAudioToServer;
-
-                        mediaRecorder.start();
-                        silenceDetector.start();
-                        isCallActive = true;
-                        callButton.textContent = 'Завершить звонок';
-                        display.innerHTML += '<p>Звонок начат. Говорите...</p>';
-                    } catch (err) {
-                        console.error('Error accessing microphone:', err);
-                        display.innerHTML += '<p>Ошибка доступа к микрофону</p>';
-                    }
+                    this.processAudio();
                 }
 
-                function endCall() {
-                    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                        mediaRecorder.stop();
-                    }
-                    if (silenceDetector) {
-                        silenceDetector.stop();
-                    }
-                    isCallActive = false;
-                    callButton.textContent = 'Начать звонок';
-                    display.innerHTML += '<p>Звонок завершен</p>';
-                }
+                processAudio() {
+                    const bufferLength = this.analyser.fftSize;
+                    const dataArray = new Uint8Array(bufferLength);
 
-                function onSilenceDetected() {
-                    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                        mediaRecorder.stop();
-                        silenceDetector.stop();
-                        display.innerHTML += '<p>Тишина обнаружена. Отправка аудио...</p>';
-                    }
-                }
-
-                function sendAudioToServer() {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    const formData = new FormData();
-                    formData.append('audio', audioBlob, 'recording.webm');
-
-                    fetch('http://127.0.0.1:5000/process_audio', {
-                        method: 'POST',
-                        body: formData
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        display.innerHTML += `<p>Ответ: ${data.response}</p>`;
-                        // Здесь можно добавить воспроизведение аудио-ответа
-                        if (isCallActive) {
-                            startCall(); // Продолжаем запись после получения ответа
+                    const checkAudio = () => {
+                        this.analyser.getByteTimeDomainData(dataArray);
+                        let sum = 0;
+                        for (let i = 0; i < bufferLength; i++) {
+                            const amplitude = (dataArray[i] - 128) / 128;
+                            sum += amplitude * amplitude;
                         }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        display.innerHTML += '<p>Ошибка при отправке аудио</p>';
-                    });
+                        const rms = Math.sqrt(sum / bufferLength);
+                        const db = 20 * Math.log10(rms);
 
-                    audioChunks = [];
+                        if (db < this.silenceThreshold) {
+                            if (!this.timeout) {
+                                this.timeout = setTimeout(() => {
+                                    this.callback();
+                                }, this.silenceDuration);
+                            }
+                        } else {
+                            if (this.timeout) {
+                                clearTimeout(this.timeout);
+                                this.timeout = null;
+                            }
+                        }
+
+                        if (this.isRunning) {
+                            requestAnimationFrame(checkAudio);
+                        }
+                    };
+
+                    this.isRunning = true;
+                    checkAudio();
                 }
 
-                class SilenceDetector {
-                    constructor(stream, callback, silenceThreshold = -50, silenceDuration = 1500) {
-                        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                        this.stream = stream;
-                        this.callback = callback;
-                        this.silenceThreshold = silenceThreshold;
-                        this.silenceDuration = silenceDuration;
+                stop() {
+                    this.isRunning = false;
+                    if (this.timeout) {
+                        clearTimeout(this.timeout);
                         this.timeout = null;
                     }
-
-                    start() {
-                        const source = this.audioContext.createMediaStreamSource(this.stream);
-                        this.analyser = this.audioContext.createAnalyser();
-                        this.analyser.fftSize = 2048;
-                        source.connect(this.analyser);
-
-                        this.processAudio();
-                    }
-
-                    processAudio() {
-                        const bufferLength = this.analyser.fftSize;
-                        const dataArray = new Uint8Array(bufferLength);
-
-                        const checkAudio = () => {
-                            this.analyser.getByteTimeDomainData(dataArray);
-                            let sum = 0;
-                            for (let i = 0; i < bufferLength; i++) {
-                                const amplitude = (dataArray[i] - 128) / 128;
-                                sum += amplitude * amplitude;
-                            }
-                            const rms = Math.sqrt(sum / bufferLength);
-                            const db = 20 * Math.log10(rms);
-
-                            if (db < this.silenceThreshold) {
-                                if (!this.timeout) {
-                                    this.timeout = setTimeout(() => {
-                                        this.callback();
-                                    }, this.silenceDuration);
-                                }
-                            } else {
-                                if (this.timeout) {
-                                    clearTimeout(this.timeout);
-                                    this.timeout = null;
-                                }
-                            }
-
-                            if (this.isRunning) {
-                                requestAnimationFrame(checkAudio);
-                            }
-                        };
-
-                        this.isRunning = true;
-                        checkAudio();
-                    }
-
-                    stop() {
-                        this.isRunning = false;
-                        if (this.timeout) {
-                            clearTimeout(this.timeout);
-                            this.timeout = null;
-                        }
-                    }
                 }
-
-                tg.ready();
-            } else {
-                console.log('Validation failed');
-                document.getElementById('error').style.display = 'block';
             }
+
+            tg.ready();
         }
 
         initApp();
