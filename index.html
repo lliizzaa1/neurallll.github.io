@@ -59,10 +59,8 @@
             let tg = window.Telegram.WebApp;
             let callButton = document.getElementById('callButton');
             let display = document.getElementById('display');
-            let mediaRecorder;
-            let audioChunks = [];
-            let silenceDetector;
             let isCallActive = false;
+            let intervalId;
 
             tg.expand();
 
@@ -76,131 +74,31 @@
                 }
             }
 
-            async function startCall() {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorder = new MediaRecorder(stream);
-                    silenceDetector = new SilenceDetector(stream, onSilenceDetected);
-
-                    mediaRecorder.ondataavailable = (event) => {
-                        audioChunks.push(event.data);
-                    };
-
-                    mediaRecorder.start();
-                    silenceDetector.start();
-                    isCallActive = true;
-                    callButton.textContent = 'Завершить звонок';
-                    display.innerHTML += '<p>Звонок начат. Говорите...</p>';
-                } catch (err) {
-                    console.error('Error accessing microphone:', err);
-                    display.innerHTML += '<p>Ошибка доступа к микрофону</p>';
-                }
+            function startCall() {
+                isCallActive = true;
+                callButton.textContent = 'Завершить звонок';
+                display.innerHTML += '<p>Звонок начат.</p>';
+                intervalId = setInterval(getResponse, 1000);
             }
 
             function endCall() {
-                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                    mediaRecorder.stop();
-                }
-                if (silenceDetector) {
-                    silenceDetector.stop();
-                }
                 isCallActive = false;
                 callButton.textContent = 'Начать звонок';
                 display.innerHTML += '<p>Звонок завершен</p>';
-            }
-
-            function onSilenceDetected() {
-                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                    mediaRecorder.stop();
-                    silenceDetector.stop();
-                    display.innerHTML += '<p>Вы: [Здесь будет ваша речь]</p>';
-                    getResponse();
-                }
+                clearInterval(intervalId);
             }
 
             function getResponse() {
-                fetch('http://127.0.0.1:5000/get_response')
+                fetch('http://localhost:5000/get_response')
                     .then(response => response.json())
                     .then(data => {
                         display.innerHTML += `<p>Собеседник: ${data.response}</p>`;
                         display.scrollTop = display.scrollHeight;
-                        
-                        // Возобновляем запись после получения ответа
-                        if (isCallActive) {
-                            startCall();
-                        }
                     })
                     .catch(error => {
                         console.error('Error:', error);
                         display.innerHTML += '<p>Ошибка при получении ответа</p>';
-                        if (isCallActive) {
-                            startCall();
-                        }
                     });
-            }
-
-            class SilenceDetector {
-                constructor(stream, callback, silenceThreshold = -50, silenceDuration = 1500) {
-                    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    this.stream = stream;
-                    this.callback = callback;
-                    this.silenceThreshold = silenceThreshold;
-                    this.silenceDuration = silenceDuration;
-                    this.timeout = null;
-                }
-
-                start() {
-                    const source = this.audioContext.createMediaStreamSource(this.stream);
-                    this.analyser = this.audioContext.createAnalyser();
-                    this.analyser.fftSize = 2048;
-                    source.connect(this.analyser);
-
-                    this.processAudio();
-                }
-
-                processAudio() {
-                    const bufferLength = this.analyser.fftSize;
-                    const dataArray = new Uint8Array(bufferLength);
-
-                    const checkAudio = () => {
-                        this.analyser.getByteTimeDomainData(dataArray);
-                        let sum = 0;
-                        for (let i = 0; i < bufferLength; i++) {
-                            const amplitude = (dataArray[i] - 128) / 128;
-                            sum += amplitude * amplitude;
-                        }
-                        const rms = Math.sqrt(sum / bufferLength);
-                        const db = 20 * Math.log10(rms);
-
-                        if (db < this.silenceThreshold) {
-                            if (!this.timeout) {
-                                this.timeout = setTimeout(() => {
-                                    this.callback();
-                                }, this.silenceDuration);
-                            }
-                        } else {
-                            if (this.timeout) {
-                                clearTimeout(this.timeout);
-                                this.timeout = null;
-                            }
-                        }
-
-                        if (this.isRunning) {
-                            requestAnimationFrame(checkAudio);
-                        }
-                    };
-
-                    this.isRunning = true;
-                    checkAudio();
-                }
-
-                stop() {
-                    this.isRunning = false;
-                    if (this.timeout) {
-                        clearTimeout(this.timeout);
-                        this.timeout = null;
-                    }
-                }
             }
 
             tg.ready();
