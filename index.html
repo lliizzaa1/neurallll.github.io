@@ -95,7 +95,7 @@
 
             function getResponse() {
                 tg.showAlert("Attempting to get response...");
-                fetch('https://your-server.com/get_response')
+                fetch('http://127.0.0.1:5000/get_response')
                     .then(response => response.json())
                     .then(data => {
                         tg.showAlert("Response received: " + data.response);
@@ -111,7 +111,7 @@
 
             function testServer() {
                 tg.showAlert("Testing server connection...");
-                fetch('https://your-server.com/test')
+                fetch('http://127.0.0.1:5000/test')
                     .then(response => response.json())
                     .then(data => {
                         console.log('Server test:', data);
