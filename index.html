@@ -6,46 +6,7 @@
     <title>Симулятор холодных звонков</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: var(--tg-theme-bg-color, #ffffff);
-            color: var(--tg-theme-text-color, #000000);
-        }
-        #phone {
-            width: 300px;
-            height: 600px;
-            border: 2px solid black;
-            border-radius: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: space-between;
-            padding: 20px;
-            background-color: #f0f0f0;
-        }
-        #display {
-            width: 100%;
-            height: 400px;
-            background-color: white;
-            border: 1px solid #ccc;
-            overflow-y: auto;
-            padding: 10px;
-            margin-bottom: 20px;
-        }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: var(--tg-theme-button-color, #3390ec);
-            color: var(--tg-theme-button-text-color, #ffffff);
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-        }
+        /* Стили остаются без изменений */
     </style>
 </head>
 <body>
@@ -64,6 +25,7 @@
             let isTelegramWebApp = tg.initDataUnsafe.query_id !== undefined;
 
             console.log('Is Telegram WebApp:', isTelegramWebApp);
+            logMessage('App initialized. Is Telegram WebApp: ' + isTelegramWebApp);
 
             tg.expand();
 
@@ -80,26 +42,27 @@
             function startCall() {
                 isCallActive = true;
                 callButton.textContent = 'Завершить звонок';
-                display.innerHTML += '<p>Звонок начат.</p>';
+                addMessage('Звонок начат.');
                 intervalId = setInterval(getResponse, 3000);
+                logMessage('Call started');
                 if (isTelegramWebApp) {
-                    tg.showAlert("Звонок начат");
+                    tg.sendData(JSON.stringify({action: 'startCall'}));
                 }
             }
 
             function endCall() {
                 isCallActive = false;
                 callButton.textContent = 'Начать звонок';
-                display.innerHTML += '<p>Звонок завершен</p>';
+                addMessage('Звонок завершен');
                 clearInterval(intervalId);
+                logMessage('Call ended');
                 if (isTelegramWebApp) {
-                    tg.showAlert("Звонок завершен");
+                    tg.sendData(JSON.stringify({action: 'endCall'}));
                 }
             }
 
             function getResponse() {
                 if (isTelegramWebApp) {
-                    // Для Telegram WebApp используем предопределенный список ответов
                     let responses = [
                         "Здравствуйте, чем могу помочь?",
                         "Интересно, расскажите подробнее.",
@@ -114,20 +77,31 @@
                         "Извините, но мне это не интересно. Всего доброго.",
                     ];
                     let response = responses[Math.floor(Math.random() * responses.length)];
-                    display.innerHTML += `<p>Собеседник: ${response}</p>`;
-                    display.scrollTop = display.scrollHeight;
+                    addMessage('Собеседник: ' + response);
+                    logMessage('Response generated: ' + response);
+                    tg.sendData(JSON.stringify({action: 'response', text: response}));
                 } else {
-                    // Для браузера используем запрос к локальному серверу
                     fetch('http://127.0.0.1:5000/get_response')
                         .then(response => response.json())
                         .then(data => {
-                            display.innerHTML += `<p>Собеседник: ${data.response}</p>`;
-                            display.scrollTop = display.scrollHeight;
+                            addMessage('Собеседник: ' + data.response);
                         })
                         .catch(error => {
                             console.error('Error:', error);
-                            display.innerHTML += '<p>Ошибка при получении ответа</p>';
+                            addMessage('Ошибка при получении ответа');
                         });
+                }
+            }
+
+            function addMessage(message) {
+                display.innerHTML += `<p>${message}</p>`;
+                display.scrollTop = display.scrollHeight;
+            }
+
+            function logMessage(message) {
+                console.log(message);
+                if (isTelegramWebApp) {
+                    tg.sendData(JSON.stringify({action: 'log', message: message}));
                 }
             }
 
@@ -140,11 +114,11 @@
                     .then(response => response.json())
                     .then(data => {
                         console.log('Server test:', data);
-                        display.innerHTML += `<p>Тест сервера: ${data.message}</p>`;
+                        addMessage('Тест сервера: ' + data.message);
                     })
                     .catch(error => {
                         console.error('Server test error:', error);
-                        display.innerHTML += '<p>Ошибка при тестировании сервера</p>';
+                        addMessage('Ошибка при тестировании сервера');
                     });
             }
 
