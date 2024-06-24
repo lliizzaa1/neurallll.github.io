@@ -6,7 +6,68 @@
     <title>Симулятор холодных звонков</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        /* Стили остаются без изменений */
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+        }
+        #phone {
+            width: 300px;
+            height: 600px;
+            border: 2px solid var(--tg-theme-button-color, #3390ec);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px;
+            background-color: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        #display {
+            width: 100%;
+            height: 400px;
+            background-color: var(--tg-theme-bg-color, #ffffff);
+            border: 1px solid var(--tg-theme-hint-color, #999999);
+            overflow-y: auto;
+            padding: 10px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        #display p {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 5px;
+            max-width: 80%;
+        }
+        #display p:nth-child(odd) {
+            background-color: var(--tg-theme-secondary-bg-color, #e6e6e6);
+            align-self: flex-start;
+        }
+        #display p:nth-child(even) {
+            background-color: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            align-self: flex-end;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: var(--tg-theme-secondary-bg-color, #2980b9);
+        }
     </style>
 </head>
 <body>
@@ -42,7 +103,7 @@
             function startCall() {
                 isCallActive = true;
                 callButton.textContent = 'Завершить звонок';
-                addMessage('Звонок начат.');
+                addMessage('Звонок начат.', 'system');
                 intervalId = setInterval(getResponse, 3000);
                 logMessage('Call started');
                 if (isTelegramWebApp) {
@@ -53,7 +114,7 @@
             function endCall() {
                 isCallActive = false;
                 callButton.textContent = 'Начать звонок';
-                addMessage('Звонок завершен');
+                addMessage('Звонок завершен', 'system');
                 clearInterval(intervalId);
                 logMessage('Call ended');
                 if (isTelegramWebApp) {
@@ -77,24 +138,27 @@
                         "Извините, но мне это не интересно. Всего доброго.",
                     ];
                     let response = responses[Math.floor(Math.random() * responses.length)];
-                    addMessage('Собеседник: ' + response);
+                    addMessage(response, 'response');
                     logMessage('Response generated: ' + response);
                     tg.sendData(JSON.stringify({action: 'response', text: response}));
                 } else {
                     fetch('http://127.0.0.1:5000/get_response')
                         .then(response => response.json())
                         .then(data => {
-                            addMessage('Собеседник: ' + data.response);
+                            addMessage(data.response, 'response');
                         })
                         .catch(error => {
                             console.error('Error:', error);
-                            addMessage('Ошибка при получении ответа');
+                            addMessage('Ошибка при получении ответа', 'error');
                         });
                 }
             }
 
-            function addMessage(message) {
-                display.innerHTML += `<p>${message}</p>`;
+            function addMessage(message, type) {
+                let p = document.createElement('p');
+                p.textContent = type === 'response' ? 'Собеседник: ' + message : message;
+                p.className = type;
+                display.appendChild(p);
                 display.scrollTop = display.scrollHeight;
             }
 
@@ -114,11 +178,11 @@
                     .then(response => response.json())
                     .then(data => {
                         console.log('Server test:', data);
-                        addMessage('Тест сервера: ' + data.message);
+                        addMessage('Тест сервера: ' + data.message, 'system');
                     })
                     .catch(error => {
                         console.error('Server test error:', error);
-                        addMessage('Ошибка при тестировании сервера');
+                        addMessage('Ошибка при тестировании сервера', 'error');
                     });
             }
 
