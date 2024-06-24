@@ -86,8 +86,6 @@
                         audioChunks.push(event.data);
                     };
 
-                    mediaRecorder.onstop = sendAudioToServer;
-
                     mediaRecorder.start();
                     silenceDetector.start();
                     isCallActive = true;
@@ -115,34 +113,30 @@
                 if (mediaRecorder && mediaRecorder.state !== 'inactive') {
                     mediaRecorder.stop();
                     silenceDetector.stop();
-                    display.innerHTML += '<p>Тишина обнаружена. Отправка аудио...</p>';
+                    display.innerHTML += '<p>Вы: [Здесь будет ваша речь]</p>';
+                    getResponse();
                 }
             }
 
-            function sendAudioToServer() {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                const formData = new FormData();
-                formData.append('audio', audioBlob, 'recording.webm');
-                formData.append('user_id', tg.initDataUnsafe.user.id); // Добавляем ID пользователя
-
-                fetch('http://127.0.0.1:5000/process_audio', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    display.innerHTML += `<p>Собеседник: ${data.response}</p>`;
-                    // Здесь можно добавить воспроизведение аудио-ответа
-                    if (isCallActive) {
-                        startCall(); // Продолжаем запись после получения ответа
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    display.innerHTML += '<p>Ошибка при отправке аудио</p>';
-                });
-
-                audioChunks = [];
+            function getResponse() {
+                fetch('http://127.0.0.1:5000/get_response')
+                    .then(response => response.json())
+                    .then(data => {
+                        display.innerHTML += `<p>Собеседник: ${data.response}</p>`;
+                        display.scrollTop = display.scrollHeight;
+                        
+                        // Возобновляем запись после получения ответа
+                        if (isCallActive) {
+                            startCall();
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        display.innerHTML += '<p>Ошибка при получении ответа</p>';
+                        if (isCallActive) {
+                            startCall();
+                        }
+                    });
             }
 
             class SilenceDetector {
