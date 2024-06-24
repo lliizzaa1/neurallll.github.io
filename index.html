@@ -46,14 +46,22 @@
             border-radius: 5px;
             max-width: 80%;
         }
-        #display p:nth-child(odd) {
+        #display p.system {
             background-color: var(--tg-theme-secondary-bg-color, #e6e6e6);
-            align-self: flex-start;
+            align-self: center;
+            text-align: center;
+            font-style: italic;
         }
-        #display p:nth-child(even) {
+        #display p.response {
             background-color: var(--tg-theme-button-color, #3390ec);
             color: var(--tg-theme-button-text-color, #ffffff);
-            align-self: flex-end;
+            align-self: flex-start;
+        }
+        #display p.error {
+            background-color: #ff4d4d;
+            color: white;
+            align-self: center;
+            text-align: center;
         }
         button {
             padding: 10px 20px;
@@ -123,34 +131,24 @@
             }
 
             function getResponse() {
+                let responses = [
+                    "Здравствуйте, чем могу помочь?",
+                    "Интересно, расскажите подробнее.",
+                    "А какие преимущества у вашего предложения?",
+                    "Сколько это будет стоить?",
+                    "Звучит неплохо, но мне нужно подумать.",
+                    "У нас уже есть поставщик. Чем ваше предложение лучше?",
+                    "Отправьте, пожалуйста, информацию на email.",
+                    "Я не принимаю решения по таким вопросам. Обратитесь к моему руководителю.",
+                    "Спасибо за информацию, я подумаю над вашим предложением.",
+                    "Хорошо, давайте созвонимся на следующей неделе.",
+                    "Извините, но мне это не интересно. Всего доброго.",
+                ];
+                let response = responses[Math.floor(Math.random() * responses.length)];
+                addMessage(response, 'response');
+                logMessage('Response generated: ' + response);
                 if (isTelegramWebApp) {
-                    let responses = [
-                        "Здравствуйте, чем могу помочь?",
-                        "Интересно, расскажите подробнее.",
-                        "А какие преимущества у вашего предложения?",
-                        "Сколько это будет стоить?",
-                        "Звучит неплохо, но мне нужно подумать.",
-                        "У нас уже есть поставщик. Чем ваше предложение лучше?",
-                        "Отправьте, пожалуйста, информацию на email.",
-                        "Я не принимаю решения по таким вопросам. Обратитесь к моему руководителю.",
-                        "Спасибо за информацию, я подумаю над вашим предложением.",
-                        "Хорошо, давайте созвонимся на следующей неделе.",
-                        "Извините, но мне это не интересно. Всего доброго.",
-                    ];
-                    let response = responses[Math.floor(Math.random() * responses.length)];
-                    addMessage(response, 'response');
-                    logMessage('Response generated: ' + response);
                     tg.sendData(JSON.stringify({action: 'response', text: response}));
-                } else {
-                    fetch('http://127.0.0.1:5000/get_response')
-                        .then(response => response.json())
-                        .then(data => {
-                            addMessage(data.response, 'response');
-                        })
-                        .catch(error => {
-                            console.error('Error:', error);
-                            addMessage('Ошибка при получении ответа', 'error');
-                        });
                 }
             }
 
@@ -167,23 +165,6 @@
                 if (isTelegramWebApp) {
                     tg.sendData(JSON.stringify({action: 'log', message: message}));
                 }
-            }
-
-            if (!isTelegramWebApp) {
-                testServer();
-            }
-
-            function testServer() {
-                fetch('http://127.0.0.1:5000/test')
-                    .then(response => response.json())
-                    .then(data => {
-                        console.log('Server test:', data);
-                        addMessage('Тест сервера: ' + data.message, 'system');
-                    })
-                    .catch(error => {
-                        console.error('Server test error:', error);
-                        addMessage('Ошибка при тестировании сервера', 'error');
-                    });
             }
 
             tg.ready();
