@@ -61,9 +61,9 @@
             let display = document.getElementById('display');
             let isCallActive = false;
             let intervalId;
+            let isTelegramWebApp = tg.initDataUnsafe.query_id !== undefined;
 
-            console.log('WebApp data:', tg.initDataUnsafe);
-            console.log('Is Telegram WebApp:', tg.initDataUnsafe.query_id !== undefined);
+            console.log('Is Telegram WebApp:', isTelegramWebApp);
 
             tg.expand();
 
@@ -81,8 +81,10 @@
                 isCallActive = true;
                 callButton.textContent = 'Завершить звонок';
                 display.innerHTML += '<p>Звонок начат.</p>';
-                intervalId = setInterval(getResponse, 1000);
-                tg.showAlert("Звонок начат");
+                intervalId = setInterval(getResponse, 3000);
+                if (isTelegramWebApp) {
+                    tg.showAlert("Звонок начат");
+                }
             }
 
             function endCall() {
@@ -90,42 +92,62 @@
                 callButton.textContent = 'Начать звонок';
                 display.innerHTML += '<p>Звонок завершен</p>';
                 clearInterval(intervalId);
-                tg.showAlert("Звонок завершен");
+                if (isTelegramWebApp) {
+                    tg.showAlert("Звонок завершен");
+                }
             }
 
             function getResponse() {
-                tg.showAlert("Attempting to get response...");
-                fetch('http://127.0.0.1:5000/get_response')
-                    .then(response => response.json())
-                    .then(data => {
-                        tg.showAlert("Response received: " + data.response);
-                        display.innerHTML += `<p>Собеседник: ${data.response}</p>`;
-                        display.scrollTop = display.scrollHeight;
-                    })
-                    .catch(error => {
-                        tg.showAlert("Error: " + error.message);
-                        console.error('Error:', error);
-                        display.innerHTML += '<p>Ошибка при получении ответа</p>';
-                    });
+                if (isTelegramWebApp) {
+                    // Для Telegram WebApp используем предопределенный список ответов
+                    let responses = [
+                        "Здравствуйте, чем могу помочь?",
+                        "Интересно, расскажите подробнее.",
+                        "А какие преимущества у вашего предложения?",
+                        "Сколько это будет стоить?",
+                        "Звучит неплохо, но мне нужно подумать.",
+                        "У нас уже есть поставщик. Чем ваше предложение лучше?",
+                        "Отправьте, пожалуйста, информацию на email.",
+                        "Я не принимаю решения по таким вопросам. Обратитесь к моему руководителю.",
+                        "Спасибо за информацию, я подумаю над вашим предложением.",
+                        "Хорошо, давайте созвонимся на следующей неделе.",
+                        "Извините, но мне это не интересно. Всего доброго.",
+                    ];
+                    let response = responses[Math.floor(Math.random() * responses.length)];
+                    display.innerHTML += `<p>Собеседник: ${response}</p>`;
+                    display.scrollTop = display.scrollHeight;
+                } else {
+                    // Для браузера используем запрос к локальному серверу
+                    fetch('http://127.0.0.1:5000/get_response')
+                        .then(response => response.json())
+                        .then(data => {
+                            display.innerHTML += `<p>Собеседник: ${data.response}</p>`;
+                            display.scrollTop = display.scrollHeight;
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            display.innerHTML += '<p>Ошибка при получении ответа</p>';
+                        });
+                }
+            }
+
+            if (!isTelegramWebApp) {
+                testServer();
             }
 
             function testServer() {
-                tg.showAlert("Testing server connection...");
                 fetch('http://127.0.0.1:5000/test')
                     .then(response => response.json())
                     .then(data => {
                         console.log('Server test:', data);
-                        tg.showAlert("Server test: " + data.message);
                         display.innerHTML += `<p>Тест сервера: ${data.message}</p>`;
                     })
                     .catch(error => {
                         console.error('Server test error:', error);
-                        tg.showAlert("Server test error: " + error.message);
                         display.innerHTML += '<p>Ошибка при тестировании сервера</p>';
                     });
             }
 
-            testServer();
             tg.ready();
         }
 
