@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Симулятор звонка</title>
+    <title>Симулятор холодных звонков</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body {
@@ -123,6 +123,7 @@
                 const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                 const formData = new FormData();
                 formData.append('audio', audioBlob, 'recording.webm');
+                formData.append('user_id', tg.initDataUnsafe.user.id); // Добавляем ID пользователя
 
                 fetch('http://127.0.0.1:5000/process_audio', {
                     method: 'POST',
@@ -130,7 +131,7 @@
                 })
                 .then(response => response.json())
                 .then(data => {
-                    display.innerHTML += `<p>Ответ: ${data.response}</p>`;
+                    display.innerHTML += `<p>Собеседник: ${data.response}</p>`;
                     // Здесь можно добавить воспроизведение аудио-ответа
                     if (isCallActive) {
                         startCall(); // Продолжаем запись после получения ответа
