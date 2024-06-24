@@ -155,22 +155,28 @@
             function sendAudioToServer() {
                 const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                 audioChunks = [];
-
+            
                 const formData = new FormData();
                 formData.append('audio', audioBlob, 'recording.webm');
-
+            
+                console.log('Sending audio to server...');
+            
                 fetch('/recognize_speech', {
                     method: 'POST',
                     body: formData
                 })
-                .then(response => response.json())
+                .then(response => {
+                    console.log('Server response:', response);
+                    return response.json();
+                })
                 .then(data => {
+                    console.log('Parsed data:', data);
                     addMessage('Вы: ' + data.user_speech, 'user');
                     addMessage(data.bot_response, 'response');
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    addMessage('Ошибка распознавания речи', 'error');
+                    addMessage('Ошибка распознавания речи: ' + error.message, 'error');
                 });
             }
 
