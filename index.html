@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Симулятор холодных звонков</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/RecordRTC/5.6.2/RecordRTC.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -96,8 +97,7 @@
             let display = document.getElementById('display');
             let isCallActive = false;
             let isTelegramWebApp = tg.initDataUnsafe.query_id !== undefined;
-            let mediaRecorder;
-            let audioChunks = [];
+            let recorder;
 
             console.log('Is Telegram WebApp:', isTelegramWebApp);
             logMessage('App initialized. Is Telegram WebApp: ' + isTelegramWebApp);
@@ -117,15 +117,13 @@
             async function startCall() {
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorder = new MediaRecorder(stream);
+                    recorder = RecordRTC(stream, {
+                        type: 'audio',
+                        mimeType: 'audio/wav',
+                        recorderType: RecordRTC.StereoAudioRecorder
+                    });
                     
-                    mediaRecorder.ondataavailable = (event) => {
-                        audioChunks.push(event.data);
-                    };
-
-                    mediaRecorder.onstop = sendAudioToServer;
-
-                    mediaRecorder.start();
+                    recorder.startRecording();
                     isCallActive = true;
                     callButton.textContent = 'Завершить звонок';
                     addMessage('Звонок начат. Говорите...', 'system');
@@ -140,8 +138,11 @@
             }
 
             function endCall() {
-                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                    mediaRecorder.stop();
+                if (recorder) {
+                    recorder.stopRecording(() => {
+                        let blob = recorder.getBlob();
+                        sendAudioToServer(blob);
+                    });
                 }
                 isCallActive = false;
                 callButton.textContent = 'Начать звонок';
@@ -152,12 +153,9 @@
                 }
             }
 
-            function sendAudioToServer() {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm;codecs=opus' });
-                audioChunks = [];
-            
+            function sendAudioToServer(audioBlob) {
                 const formData = new FormData();
-                formData.append('audio', audioBlob, 'recording.webm');
+                formData.append('audio', audioBlob, 'recording.wav');
             
                 console.log('Sending audio to server...');
             
