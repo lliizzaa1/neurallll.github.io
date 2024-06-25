@@ -117,64 +117,50 @@
             async function startCall() {
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    recorder = RecordRTC(stream, {
-                        type: 'audio',
-                        mimeType: 'audio/wav',
-                        recorderType: RecordRTC.StereoAudioRecorder
+                    recorder = new MediaRecorder(stream, {
+                        mimeType: 'audio/wav'
                     });
                     
-                    recorder.startRecording();
+                    let chunks = [];
+                    
+                    recorder.ondataavailable = (e) => {
+                        chunks.push(e.data);
+                    };
+                    
+                    recorder.onstop = () => {
+                        const blob = new Blob(chunks, { type: 'audio/wav' });
+                        sendAudioToServer(blob);
+                    };
+                    
+                    recorder.start();
                     isCallActive = true;
                     callButton.textContent = 'Завершить звонок';
                     addMessage('Звонок начат. Говорите...', 'system');
-                    logMessage('Call started');
-                    if (isTelegramWebApp) {
-                        tg.sendData(JSON.stringify({action: 'startCall'}));
-                    }
                 } catch (err) {
                     console.error('Error accessing microphone:', err);
                     addMessage('Ошибка доступа к микрофону', 'error');
                 }
             }
-
+            
             function endCall() {
-                if (recorder) {
-                    recorder.stopRecording(() => {
-                        let blob = recorder.getBlob();
-                        sendAudioToServer(blob);
-                    });
+                if (recorder && recorder.state !== 'inactive') {
+                    recorder.stop();
                 }
                 isCallActive = false;
                 callButton.textContent = 'Начать звонок';
                 addMessage('Звонок завершен', 'system');
-                logMessage('Call ended');
-                if (isTelegramWebApp) {
-                    tg.sendData(JSON.stringify({action: 'endCall'}));
-                }
             }
-
+            
             function sendAudioToServer(audioBlob) {
                 const formData = new FormData();
                 formData.append('audio', audioBlob, 'recording.wav');
-            
-                console.log('Sending audio to server...');
             
                 fetch('http://localhost:5000/recognize_speech', {
                     method: 'POST',
                     body: formData
                 })
-                .then(response => {
-                    console.log('Server response:', response);
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    return response.json();
-                })
+                .then(response => response.json())
                 .then(data => {
-                    console.log('Parsed data:', data);
-                    if (data.error) {
-                        throw new Error(`Server error: ${data.error}`);
-                    }
                     addMessage('Вы: ' + data.user_speech, 'user');
                     addMessage(data.bot_response, 'response');
                 })
@@ -183,7 +169,7 @@
                     addMessage('Ошибка распознавания речи: ' + error.message, 'error');
                 });
             }
-
+            
             function addMessage(message, type) {
                 let p = document.createElement('p');
                 p.textContent = type === 'response' ? 'Собеседник: ' + message : message;
