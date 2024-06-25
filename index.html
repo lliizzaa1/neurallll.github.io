@@ -5,8 +5,83 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Симулятор холодных звонков</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/RecordRTC/5.6.2/RecordRTC.min.js"></script>
     <style>
-        /* Ваши стили остаются без изменений */
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+        }
+        #phone {
+            width: 300px;
+            height: 600px;
+            border: 2px solid var(--tg-theme-button-color, #3390ec);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px;
+            background-color: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        #display {
+            width: 100%;
+            height: 400px;
+            background-color: var(--tg-theme-bg-color, #ffffff);
+            border: 1px solid var(--tg-theme-hint-color, #999999);
+            overflow-y: auto;
+            padding: 10px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        #display p {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 5px;
+            max-width: 80%;
+        }
+        #display p.system {
+            background-color: var(--tg-theme-secondary-bg-color, #e6e6e6);
+            align-self: center;
+            text-align: center;
+            font-style: italic;
+        }
+        #display p.response {
+            background-color: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            align-self: flex-start;
+        }
+        #display p.user {
+            background-color: var(--tg-theme-secondary-bg-color, #e6e6e6);
+            align-self: flex-end;
+            text-align: right;
+        }
+        #display p.error {
+            background-color: #ff4d4d;
+            color: white;
+            align-self: center;
+            text-align: center;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: var(--tg-theme-secondary-bg-color, #2980b9);
+        }
     </style>
 </head>
 <body>
@@ -22,8 +97,7 @@
             let display = document.getElementById('display');
             let isCallActive = false;
             let isTelegramWebApp = tg.initDataUnsafe.query_id !== undefined;
-            let mediaRecorder;
-            let audioChunks = [];
+            let recorder;
 
             console.log('Is Telegram WebApp:', isTelegramWebApp);
             logMessage('App initialized. Is Telegram WebApp: ' + isTelegramWebApp);
@@ -43,15 +117,13 @@
             async function startCall() {
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/wav' });
+                    recorder = RecordRTC(stream, {
+                        type: 'audio',
+                        mimeType: 'audio/wav',
+                        recorderType: RecordRTC.StereoAudioRecorder
+                    });
                     
-                    mediaRecorder.ondataavailable = (event) => {
-                        audioChunks.push(event.data);
-                    };
-
-                    mediaRecorder.onstop = sendAudioToServer;
-
-                    mediaRecorder.start();
+                    recorder.startRecording();
                     isCallActive = true;
                     callButton.textContent = 'Завершить звонок';
                     addMessage('Звонок начат. Говорите...', 'system');
@@ -66,8 +138,11 @@
             }
 
             function endCall() {
-                if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                    mediaRecorder.stop();
+                if (recorder) {
+                    recorder.stopRecording(() => {
+                        let blob = recorder.getBlob();
+                        sendAudioToServer(blob);
+                    });
                 }
                 isCallActive = false;
                 callButton.textContent = 'Начать звонок';
@@ -78,10 +153,7 @@
                 }
             }
 
-            function sendAudioToServer() {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                audioChunks = [];
-            
+            function sendAudioToServer(audioBlob) {
                 const formData = new FormData();
                 formData.append('audio', audioBlob, 'recording.wav');
             
