@@ -161,7 +161,7 @@
             
                 console.log('Sending audio to server...');
             
-                fetch('/recognize_speech', {
+                fetch('http://localhost:5000/recognize_speech', {
                     method: 'POST',
                     body: formData
                 })
