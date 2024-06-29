@@ -153,36 +153,54 @@
                 }
             }
 
-            function sendAudioToServer(audioBlob) {
+            async function sendAudioToServer(audioBlob) {
                 const formData = new FormData();
-                formData.append('audio', audioBlob, 'recording.wav');
+                formData.append('audio', audioBlob, 'audio.wav');
             
-                console.log('Sending audio to server...');
+                try {
+                    const response = await fetch('http://localhost:5000/recognize_speech', {
+                        method: 'POST',
+                        body: formData
+                    });
             
-                fetch('http://localhost:5000/recognize_speech', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => {
-                    console.log('Server response:', response);
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
+                    const data = await response.json();
+            
+                    if (response.ok) {
+                        console.log("User speech:", data.user_speech);
+                        console.log("Bot response:", data.bot_response);
+                        
+                        // Воспроизведение аудио ответа
+                        const audio = new Audio(data.audio_url);
+                        audio.play();
+            
+                        // Обновление интерфейса с текстом ответа
+                        updateChatInterface(data.user_speech, data.bot_response);
+                    } else {
+                        console.error("Error:", data.error);
+                        // Обработка ошибки, например, показ сообщения пользователю
+                        showErrorMessage(data.error);
                     }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('Parsed data:', data);
-                    if (data.error) {
-                        throw new Error(`Server error: ${data.error}`);
-                    }
-                    addMessage('Вы: ' + data.user_speech, 'user');
-                    addMessage(data.bot_response, 'response');
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    addMessage('Ошибка распознавания речи: ' + error.message, 'error');
-                });
+                } catch (error) {
+                    console.error("Network error:", error);
+                    // Обработка сетевой ошибки
+                    showErrorMessage("Network error. Please try again.");
+                }
             }
+            
+            function updateChatInterface(userSpeech, botResponse) {
+                // Добавьте здесь код для обновления интерфейса чата
+                // Например, добавление новых сообщений в список чата
+                const chatList = document.getElementById('chat-list');
+                chatList.innerHTML += `<li>You: ${userSpeech}</li>`;
+                chatList.innerHTML += `<li>Bot: ${botResponse}</li>`;
+            }
+            
+            function showErrorMessage(message) {
+                // Добавьте здесь код для отображения сообщения об ошибке пользователю
+                // Например, показ всплывающего окна или обновление элемента на странице
+                alert(message);
+            }
+            
 
             function addMessage(message, type) {
                 let p = document.createElement('p');
