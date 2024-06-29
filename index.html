@@ -169,20 +169,14 @@
                     if (response.ok) {
                         console.log("User speech:", data.user_speech);
                         console.log("Bot response:", data.bot_response);
-                        console.log("Audio URL:", data.audio_url);
                         
+                        // Добавление сообщений пользователя и бота в интерфейс
                         addMessage(data.user_speech, 'user');
                         addMessage(data.bot_response, 'response');
                         
-                        // Используем полный URL для аудио
-                        const audioUrl = new URL(data.audio_url, 'http://localhost:5000').href;
-                        console.log("Full audio URL:", audioUrl);
-                        
-                        const audio = new Audio(audioUrl);
-                        audio.play().catch(error => {
-                            console.error("Error playing audio:", error);
-                            addMessage("Error playing audio. Please check your audio settings.", 'error');
-                        });
+                        // Автоматическое воспроизведение аудио ответа
+                        const audio = new Audio(`http://localhost:5000${data.audio_url}`);
+                        audio.play();
                     } else {
                         console.error("Error:", data.error);
                         addMessage(data.error, 'error');
@@ -190,6 +184,22 @@
                 } catch (error) {
                     console.error("Network error:", error);
                     addMessage("Network error. Please try again.", 'error');
+                }
+            }
+
+            function addMessage(message, type) {
+                let p = document.createElement('p');
+                p.textContent = type === 'response' ? 'Собеседник: ' + message : 
+                                type === 'user' ? 'Вы: ' + message : message;
+                p.className = type;
+                display.appendChild(p);
+                display.scrollTop = display.scrollHeight;
+            }
+
+            function logMessage(message) {
+                console.log(message);
+                if (isTelegramWebApp) {
+                    tg.sendData(JSON.stringify({action: 'log', message: message}));
                 }
             }
 
