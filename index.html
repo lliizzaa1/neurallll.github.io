@@ -98,6 +98,7 @@
             let isCallActive = false;
             let isTelegramWebApp = tg.initDataUnsafe.query_id !== undefined;
             let recorder;
+            let audioBlob;
 
             console.log('Is Telegram WebApp:', isTelegramWebApp);
             logMessage('App initialized. Is Telegram WebApp: ' + isTelegramWebApp);
@@ -140,8 +141,8 @@
             function endCall() {
                 if (recorder) {
                     recorder.stopRecording(() => {
-                        let blob = recorder.getBlob();
-                        sendAudioToServer(blob);
+                        audioBlob = recorder.getBlob();
+                        sendAudioToServer(audioBlob);
                     });
                 }
                 isCallActive = false;
@@ -169,42 +170,27 @@
                         console.log("User speech:", data.user_speech);
                         console.log("Bot response:", data.bot_response);
                         
-                        // Воспроизведение аудио ответа
-                        const audio = new Audio(data.audio_url);
+                        // Добавление сообщений пользователя и бота в интерфейс
+                        addMessage(data.user_speech, 'user');
+                        addMessage(data.bot_response, 'response');
+                        
+                        // Автоматическое воспроизведение аудио ответа
+                        const audio = new Audio(`http://localhost:5000${data.audio_url}`);
                         audio.play();
-            
-                        // Обновление интерфейса с текстом ответа
-                        updateChatInterface(data.user_speech, data.bot_response);
                     } else {
                         console.error("Error:", data.error);
-                        // Обработка ошибки, например, показ сообщения пользователю
-                        showErrorMessage(data.error);
+                        addMessage(data.error, 'error');
                     }
                 } catch (error) {
                     console.error("Network error:", error);
-                    // Обработка сетевой ошибки
-                    showErrorMessage("Network error. Please try again.");
+                    addMessage("Network error. Please try again.", 'error');
                 }
             }
-            
-            function updateChatInterface(userSpeech, botResponse) {
-                // Добавьте здесь код для обновления интерфейса чата
-                // Например, добавление новых сообщений в список чата
-                const chatList = document.getElementById('chat-list');
-                chatList.innerHTML += `<li>You: ${userSpeech}</li>`;
-                chatList.innerHTML += `<li>Bot: ${botResponse}</li>`;
-            }
-            
-            function showErrorMessage(message) {
-                // Добавьте здесь код для отображения сообщения об ошибке пользователю
-                // Например, показ всплывающего окна или обновление элемента на странице
-                alert(message);
-            }
-            
 
             function addMessage(message, type) {
                 let p = document.createElement('p');
-                p.textContent = type === 'response' ? 'Собеседник: ' + message : message;
+                p.textContent = type === 'response' ? 'Собеседник: ' + message : 
+                                type === 'user' ? 'Вы: ' + message : message;
                 p.className = type;
                 display.appendChild(p);
                 display.scrollTop = display.scrollHeight;
