@@ -176,7 +176,18 @@
                         
                         // Автоматическое воспроизведение аудио ответа
                         const audio = new Audio(`http://localhost:5000${data.audio_url}`);
-                        audio.play();
+
+                        // Ждем, пока аудио загрузится
+                        audio.addEventListener('canplaythrough', () => {
+                            audio.play(); 
+                        }, false);
+
+                        // Обработка ошибок загрузки и воспроизведения
+                        audio.addEventListener('error', (error) => {
+                            console.error("Ошибка при загрузке или воспроизведении аудио:", error);
+                            // Добавьте обработку ошибки, например, выведите сообщение об ошибке пользователю
+                        }); 
+
                     } else {
                         console.error("Error:", data.error);
                         addMessage(data.error, 'error');
