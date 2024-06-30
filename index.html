@@ -184,7 +184,7 @@
                         new URL(data.audio_data);
               
                         const audio = new Audio();
-                        audio.type = 'audio/wav'; // Указываем MIME-тип WAV
+                        audio.type = 'audio/mpeg';
                         audio.src = data.audio_data;
               
                         audio.oncanplaythrough = () => {

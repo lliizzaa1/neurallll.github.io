@@ -1,224 +1,227 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Симулятор холодных звонков</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/RecordRTC/5.6.2/RecordRTC.min.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background-color: var(--tg-theme-bg-color, #ffffff);
-            color: var(--tg-theme-text-color, #000000);
-        }
-        #phone {
-            width: 300px;
-            height: 600px;
-            border: 2px solid var(--tg-theme-button-color, #3390ec);
-            border-radius: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: space-between;
-            padding: 20px;
-            background-color: var(--tg-theme-secondary-bg-color, #f0f0f0);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        #display {
-            width: 100%;
-            height: 400px;
-            background-color: var(--tg-theme-bg-color, #ffffff);
-            border: 1px solid var(--tg-theme-hint-color, #999999);
-            overflow-y: auto;
-            padding: 10px;
-            margin-bottom: 20px;
-            font-size: 14px;
-            line-height: 1.5;
-        }
-        #display p {
-            margin: 5px 0;
-            padding: 5px;
-            border-radius: 5px;
-            max-width: 80%;
-        }
-        #display p.system {
-            background-color: var(--tg-theme-secondary-bg-color, #e6e6e6);
-            align-self: center;
-            text-align: center;
-            font-style: italic;
-        }
-        #display p.response {
-            background-color: var(--tg-theme-button-color, #3390ec);
-            color: var(--tg-theme-button-text-color, #ffffff);
-            align-self: flex-start;
-        }
-        #display p.user {
-            background-color: var(--tg-theme-secondary-bg-color, #e6e6e6);
-            align-self: flex-end;
-            text-align: right;
-        }
-        #display p.error {
-            background-color: #ff4d4d;
-            color: white;
-            align-self: center;
-            text-align: center;
-        }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: var(--tg-theme-button-color, #3390ec);
-            color: var(--tg-theme-button-text-color, #ffffff);
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        button:hover {
-            background-color: var(--tg-theme-secondary-bg-color, #2980b9);
-        }
-    </style>
-</head>
-<body>
-    <div id="phone">
-        <div id="display"></div>
-        <button id="callButton">Начать звонок</button>
-    </div>
+from flask import Flask, jsonify, request, session, make_response
+from flask_cors import CORS
+import logging
+import random
+from speech_recognition_mine import recognize_speech_from_file
+import os
+import aiohttp
+import asyncio
+from dotenv import load_dotenv
+from gtts import gTTS
+import tempfile
+import uuid
+import pyttsx3
+import io
+import base64
+import wave
+from flask_cors import cross_origin
 
-    <script>
-        function initApp() {
-            let tg = window.Telegram.WebApp;
-            let callButton = document.getElementById('callButton');
-            let display = document.getElementById('display');
-            let isCallActive = false;
-            let isTelegramWebApp = tg.initDataUnsafe.query_id !== undefined;
-            let recorder;
-            let audioBlob;
+semaphore = asyncio.Semaphore(50)
 
-            console.log('Is Telegram WebApp:', isTelegramWebApp);
-            logMessage('App initialized. Is Telegram WebApp: ' + isTelegramWebApp);
+load_dotenv()
+API_KEY = os.getenv("API_KEY")
 
-            tg.expand();
+async def get_response(conversation_history):
+    system_message = {
+        "role": "system",
+        "content": """Ты - потенциальный клиент финансовой управляющей компании, которому неожиданно звонит финансовый консультант. Твоя задача - реалистично отвечать на вопросы и реагировать на предложения консультанта, исходя из следующих случайно выбранных характеристик:
 
-            callButton.addEventListener('click', toggleCall);
 
-            function toggleCall() {
-                if (isCallActive) {
-                    endCall();
-                } else {
-                    startCall();
-                }
-            }
 
-            async function startCall() {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    recorder = RecordRTC(stream, {
-                        type: 'audio',
-                        mimeType: 'audio/wav',
-                        recorderType: RecordRTC.StereoAudioRecorder
-                    });
-                    
-                    recorder.startRecording();
-                    isCallActive = true;
-                    callButton.textContent = 'Завершить звонок';
-                    addMessage('Звонок начат. Говорите...', 'system');
-                    logMessage('Call started');
-                    if (isTelegramWebApp) {
-                        tg.sendData(JSON.stringify({action: 'startCall'}));
+Голос: [мужской/женский], [высокий/низкий], [энергичный/уставший], [быстрый/медленный темп речи]
+
+Возраст: [случайное число от 30 до 75]
+
+Финансовое положение: [от "я банкрот" до "у меня несколько сотен миллионов долларов"]
+
+Опыт в инвестициях: [от "совсем не знаком" до "профессиональный трейдер"]
+
+Начальное настроение: [дружелюбное/раздраженное/торопливое/агрессивное/заносчивое]
+
+
+Помни, что ты часто получаешь подобные звонки и можешь проявлять осторожность или раздражение в начале разговора. Твое настроение может меняться в зависимости от того, как консультант ведет диалог.
+
+
+Учитывай текущее время суток в контексте разговора (например, ты можешь быть на работе, обеде, в пути домой и т.д.).
+
+
+Ты можешь задавать вопросы о компании Альфа-Капитал, в том числе о ее связи с Альфа-Банком.
+
+
+Завершение разговора может быть разным: от назначения встречи до жесткого отказа, в зависимости от того, насколько убедительным будет консультант.
+
+
+Веди себя естественно и реалистично, как обычный человек в подобной ситуации. Возвращай только текст, без меток действия и т.п."""
+    }
+    
+    messages = [system_message] + conversation_history
+    
+    async with aiohttp.ClientSession() as session:
+        response_json = await send_request(session, messages)
+        
+    if response_json and 'choices' in response_json:
+        return response_json['choices'][0]['message']['content']
+    else:
+        return "Извините, произошла ошибка при обработке вашего запроса."
+
+async def send_request(session, messages, max_retries=10, retry_delay=2):
+    for attempt in range(max_retries):
+        try:
+            async with semaphore:
+                async with session.post(
+                    url="https://openrouter.ai/api/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {API_KEY}",
+                    },
+                    json={
+                        "model": "anthropic/claude-3-haiku",
+                        "messages": messages,
+                        "provider": {"order": ["Anthropic"]},
+                        "max_tokens": 200000,
+                        "temperature": 0.5,
+                        "top_p": 0.5,
+                        "top_k": 50,
+                        "samplingParameters": {
+                            "temperature": 0.5,
+                            "top_p": 0.5,
+                            "top_k": 50
+                        },
                     }
-                } catch (err) {
-                    console.error('Error accessing microphone:', err);
-                    addMessage('Ошибка доступа к микрофону', 'error');
-                }
-            }
+                ) as response:
+                    if response.status == 200:
+                        response_json = await response.json()
+                        return response_json
+                    else:
+                        error_message = f"API request failed with status {response.status}: {response.reason}"
+                        print(error_message)  # Или запишите в лог
+        except Exception as e:
+            print(f"Error in send_request: {str(e)}")  # Или запишите в лог
 
-            function endCall() {
-                if (recorder) {
-                    recorder.stopRecording(() => {
-                        audioBlob = recorder.getBlob();
-                        sendAudioToServer(audioBlob);
-                    });
-                }
-                isCallActive = false;
-                callButton.textContent = 'Начать звонок';
-                addMessage('Звонок завершен', 'system');
-                logMessage('Call ended');
-                if (isTelegramWebApp) {
-                    tg.sendData(JSON.stringify({action: 'endCall'}));
-                }
-            }
+        if attempt == max_retries - 1:
+            return None
 
-            async function sendAudioToServer(audioBlob) {
-                const formData = new FormData();
-                formData.append('audio', audioBlob, 'audio.wav');
-            
-                try {
-                    const response = await fetch('http://localhost:5000/recognize_speech', {
-                        method: 'POST',
-                        body: formData
-                    });
-            
-                    if (response.ok) {
-                        const data = await response.json();
-                        console.log("User speech:", data.user_speech);
-                        console.log("Bot response:", data.bot_response);
-                        
-                        addMessage(data.user_speech, 'user');
-                        addMessage(data.bot_response, 'response');
-                        
-                        if (data.audio_data) {
-                            // Предполагаем, что audio_data - это URL или base64-encoded строка
-                            const audio = new Audio(data.audio_data);
-                            audio.oncanplaythrough = () => {
-                                audio.play().catch(error => console.error("Error playing audio:", error));
-                            };
-                            audio.onerror = (e) => {
-                                console.error("Error loading audio:", e);
-                            };
-                        }
-                    } else {
-                        console.error('Server error:', response.statusText);
-                        addMessage("Sorry, there was an error processing your request.", 'error');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                    addMessage("Sorry, there was an error sending your audio.", 'error');
-                }
-            
-                // Очищаем сообщение о записи
-                const recordingStatus = document.getElementById('recordingStatus');
-                if (recordingStatus) {
-                    recordingStatus.textContent = '';
-                }
-            }
-            
-            
-            function addMessage(message, type) {
-                let p = document.createElement('p');
-                p.textContent = type === 'response' ? 'Собеседник: ' + message : 
-                                type === 'user' ? 'Вы: ' + message : message;
-                p.className = type;
-                display.appendChild(p);
-                display.scrollTop = display.scrollHeight;
-            }
+        await asyncio.sleep(retry_delay)
 
-            function logMessage(message) {
-                console.log(message);
-                if (isTelegramWebApp) {
-                    tg.sendData(JSON.stringify({action: 'log', message: message}));
-                }
-            }
+    return None
 
-            tg.ready();
-        }
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
-        initApp();
-    </script>
-</body>
-</html>
+app = Flask(__name__)
+app.secret_key = 'your_secret_key_here'  # Замените на свой секретный ключ
+#CORS(app, resources={r"/*": {"origins": "https://lliizzaa1.github.io"}}) #http://localhost:5000/
+origins = [
+    "http://127.0.0.1:5000",  #  <-  Если ты используешь этот адрес для разработки
+    "https://lliizzaa1.github.io"  #  <- Домен GitHub Pages 
+]
+
+# Создаём экземпляр CORS, указав origins
+cors = CORS(app, resources={r"/*": {"origins": origins}})
+
+
+conversation_state = {
+    "greeting_done": False,
+    "product_mentioned": False,
+    "price_mentioned": False,
+    "closing_attempted": False
+}
+
+@app.route('/start_call', methods=['POST'])
+def start_call():
+    global conversation_state
+    conversation_state = {
+        "greeting_done": False,
+        "product_mentioned": False,
+        "price_mentioned": False,
+        "closing_attempted": False
+    }
+    session['conversation_history'] = []
+    logging.info("Call started")
+    return jsonify({"message": "Call started"})
+
+@app.route('/end_call', methods=['POST'])
+def end_call():
+    global conversation_state
+    conversation_state = {
+        "greeting_done": False,
+        "product_mentioned": False,
+        "price_mentioned": False,
+        "closing_attempted": False
+    }
+    conversation_history = session.pop('conversation_history', [])
+    logging.info("Call ended")
+    return jsonify({"message": "Call ended", "conversation_history": conversation_history})
+
+@app.route('/test', methods=['GET'])
+def test():
+    logging.info("Test endpoint called")
+    return jsonify({"message": "Server is working!"})
+
+#@app.after_request
+#def after_request(response):
+#    response.headers.add('Access-Control-Allow-Origin', '*')
+#    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+#    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+#    return response
+
+def generate_audio(text):
+  print("Генерирую речь...")
+  tts = gTTS(text=text, lang='ru') 
+
+  # Используем BytesIO для сохранения аудио в памяти
+  with io.BytesIO() as memory_buffer: 
+    tts.write_to_fp(memory_buffer)
+    memory_buffer.seek(0) 
+    audio_data = memory_buffer.read()
+  
+  print("Речь сгенерирована")
+  return audio_data
+
+
+@app.route('/recognize_speech', methods=['POST'])
+async def handle_speech():
+    if 'audio' not in request.files:
+        return jsonify({"error": "No audio file provided"}), 400
+    
+    audio_file = request.files['audio']
+    
+    if audio_file.filename == '':
+        return jsonify({"error": "No selected file"}), 400
+    
+    if audio_file:
+        user_speech = recognize_speech_from_file(audio_file)
+        
+        if user_speech is None:
+            return jsonify({"error": "Ошибка распознавания речи"}), 500
+        
+        conversation_history = session.get('conversation_history', [])
+        conversation_history.append({"role": "user", "content": user_speech})
+        
+        bot_response = await get_response(conversation_history)
+        
+        conversation_history.append({"role": "assistant", "content": bot_response})
+        session['conversation_history'] = conversation_history
+        
+        print(f"Текст для генерации: {bot_response}")  #  <-  Добавь эту строку
+        audio_data = generate_audio(bot_response)
+        
+        # Кодируем аудио в base64
+        audio_data_base64 = base64.b64encode(audio_data).decode('utf-8')
+        
+        response = make_response(jsonify({
+        "user_speech": user_speech,
+        "bot_response": bot_response,
+        "audio_data": f"data:audio/wav;base64,{audio_data_base64}"
+    }))
+
+        # Добавляем заголовки CORS вручную
+        response.headers['Access-Control-Allow-Origin'] = '*'  #  <-  Разрешаем доступ с любого домена (для разработки)
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+        response.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
+
+        return response, 200
+        
+    
+    return jsonify({"error": "Invalid file"}), 400
+
+if __name__ == '__main__':
+    app.run(debug=True, host='0.0.0.0', port=5000)
