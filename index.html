@@ -164,8 +164,6 @@
                         body: formData
                     });
             
-                    const data = await response.json();
-            
                     if (response.ok) {
                         const data = await response.json();
                         console.log("User speech:", data.user_speech);
@@ -174,20 +172,23 @@
                         addMessage(data.user_speech, 'user');
                         addMessage(data.bot_response, 'response');
                         
-                        // Создаем и воспроизводим аудио из Data URL
-                        const audio = new Audio(data.audio_data);
-                        audio.play().catch(error => console.error("Error playing audio:", error));
-                    }
-               else {
-                        console.error("Error:", data.error);
-                        addMessage(data.error, 'error');
+                        if (data.audio_data) {
+                            const audio = new Audio(data.audio_data);
+                            audio.play().catch(error => console.error("Error playing audio:", error));
+                        }
+                    } else {
+                        console.error('Server error:', response.statusText);
+                        addMessage("Sorry, there was an error processing your request.", 'error');
                     }
                 } catch (error) {
-                    console.error("Network error:", error);
-                    addMessage("Network error. Please try again.", 'error');
+                    console.error('Error:', error);
+                    addMessage("Sorry, there was an error sending your audio.", 'error');
                 }
+            
+                // Очищаем сообщение о записи
+                document.getElementById('recordingStatus').textContent = '';
             }
-
+            
             function addMessage(message, type) {
                 let p = document.createElement('p');
                 p.textContent = type === 'response' ? 'Собеседник: ' + message : 
