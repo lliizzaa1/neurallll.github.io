@@ -7,137 +7,222 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/RecordRTC/5.6.2/RecordRTC.min.js"></script>
     <style>
-        /* ... Стили без изменений */
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: var(--tg-theme-bg-color, #ffffff);
+            color: var(--tg-theme-text-color, #000000);
+        }
+        #phone {
+            width: 300px;
+            height: 600px;
+            border: 2px solid var(--tg-theme-button-color, #3390ec);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 20px;
+            background-color: var(--tg-theme-secondary-bg-color, #f0f0f0);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        #display {
+            width: 100%;
+            height: 400px;
+            background-color: var(--tg-theme-bg-color, #ffffff);
+            border: 1px solid var(--tg-theme-hint-color, #999999);
+            overflow-y: auto;
+            padding: 10px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        #display p {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 5px;
+            max-width: 80%;
+        }
+        #display p.system {
+            background-color: var(--tg-theme-secondary-bg-color, #e6e6e6);
+            align-self: center;
+            text-align: center;
+            font-style: italic;
+        }
+        #display p.response {
+            background-color: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            align-self: flex-start;
+        }
+        #display p.user {
+            background-color: var(--tg-theme-secondary-bg-color, #e6e6e6);
+            align-self: flex-end;
+            text-align: right;
+        }
+        #display p.error {
+            background-color: #ff4d4d;
+            color: white;
+            align-self: center;
+            text-align: center;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: var(--tg-theme-button-color, #3390ec);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: var(--tg-theme-secondary-bg-color, #2980b9);
+        }
     </style>
 </head>
 <body>
     <div id="phone">
         <div id="display">
-            <p id="recordingStatus"></p> </div> 
+            <p id="recordingStatus"></p> 
+        </div> 
         <button id="callButton">Начать звонок</button>
     </div>
 
     <script>
-        function initApp() {
-            let tg = window.Telegram.WebApp;
-            let callButton = document.getElementById('callButton');
-            let display = document.getElementById('display');
-            let isCallActive = false;
-            let isTelegramWebApp = tg.initDataUnsafe.query_id !== undefined;
-            let recorder;
-            let audioBlob;
+      function initApp() {
+        let tg = window.Telegram.WebApp;
+        let callButton = document.getElementById('callButton');
+        let display = document.getElementById('display');
+        let isCallActive = false;
+        let isTelegramWebApp = tg.initDataUnsafe.query_id !== undefined;
+        let recorder;
+        let audioBlob;
 
-            console.log('Is Telegram WebApp:', isTelegramWebApp);
-            logMessage('App initialized. Is Telegram WebApp: ' + isTelegramWebApp);
+        console.log('Is Telegram WebApp:', isTelegramWebApp);
+        logMessage('App initialized. Is Telegram WebApp: ' + isTelegramWebApp);
 
-            tg.expand();
+        tg.expand();
 
-            callButton.addEventListener('click', toggleCall);
+        callButton.addEventListener('click', toggleCall);
 
-            function toggleCall() {
-                if (isCallActive) {
-                    endCall();
-                } else {
-                    startCall();
-                }
+        function toggleCall() {
+          if (isCallActive) {
+            endCall();
+          } else {
+            startCall();
+          }
+        }
+
+        async function startCall() {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            recorder = RecordRTC(stream, {
+              type: 'audio',
+              mimeType: 'audio/wav',
+              recorderType: RecordRTC.StereoAudioRecorder
+            });
+
+            recorder.startRecording();
+            isCallActive = true;
+            callButton.textContent = 'Завершить звонок';
+            addMessage('Звонок начат. Говорите...', 'system');
+            logMessage('Call started');
+            if (isTelegramWebApp) {
+              tg.sendData(JSON.stringify({ action: 'startCall' }));
             }
 
-            async function startCall() {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    recorder = RecordRTC(stream, {
-                        type: 'audio',
-                        mimeType: 'audio/wav',
-                        recorderType: RecordRTC.StereoAudioRecorder
-                    });
-                    
-                    recorder.startRecording();
-                    isCallActive = true;
-                    callButton.textContent = 'Завершить звонок';
-                    addMessage('Звонок начат. Говорите...', 'system');
-                    logMessage('Call started');
-                    if (isTelegramWebApp) {
-                        tg.sendData(JSON.stringify({action: 'startCall'}));
-                    }
-                } catch (err) {
-                    console.error('Error accessing microphone:', err);
-                    addMessage('Ошибка доступа к микрофону', 'error');
-                }
-            }
+          } catch (err) {
+            console.error('Error accessing microphone:', err);
+            addMessage('Ошибка доступа к микрофону', 'error');
+          }
+        }
 
-            function endCall() {
-                if (recorder) {
-                    recorder.stopRecording(() => {
-                        audioBlob = recorder.getBlob();
-                        sendAudioToServer(audioBlob);
-                    });
-                }
-                isCallActive = false;
-                callButton.textContent = 'Начать звонок';
-                addMessage('Звонок завершен', 'system');
-                logMessage('Call ended');
-                if (isTelegramWebApp) {
-                    tg.sendData(JSON.stringify({action: 'endCall'}));
-                }
-            }
+        function endCall() {
+          if (recorder) {
+            recorder.stopRecording(() => {
+              audioBlob = recorder.getBlob();
+              sendAudioToServer(audioBlob);
+            });
+          }
+          isCallActive = false;
+          callButton.textContent = 'Начать звонок';
+          addMessage('Звонок завершен', 'system');
+          logMessage('Call ended');
+          if (isTelegramWebApp) {
+            tg.sendData(JSON.stringify({ action: 'endCall' }));
+          }
+        }
 
-            async function sendAudioToServer(audioBlob) {
-                const formData = new FormData();
-                formData.append('audio', audioBlob, 'audio.wav');
-              
-                try {
-                  const response = await fetch('http://127.0.0.1:5000/recognize_speech', { 
-                    method: 'POST',
-                    body: formData
-                  });
-              
-                  if (response.ok) {
-                    const data = await response.json();
-                    console.log("User speech:", data.user_speech);
-                    console.log("Bot response:", data.bot_response);
-                    console.log("Ответ сервера:", data);
-                    console.log("audio_data:", data.audio_data);
-              
-                    if (data.user_speech) {
-                      addMessage(data.user_speech, 'user');
-                    }
-                    if (data.bot_response) {
-                      addMessage(data.bot_response, 'response');
-                    }
-              
-                    if (data.audio_data) {
-                      try {
-                        new URL(data.audio_data);
-              
-                        const audio = new Audio();
-                        audio.type = 'audio/mpeg';
-                        audio.src = data.audio_data;
-              
-                        audio.oncanplaythrough = () => {
-                          audio.play().catch(error => {
-                            console.error("Error playing audio:", error);
-                            document.getElementById('recordingStatus').textContent = "Error playing audio response.";
-                          });
-                        };
-              
-                        audio.onerror = (e) => {
-                          console.error("Error loading audio:", e);
-                          document.getElementById('recordingStatus').textContent = "Error loading audio response.";
-                        };
-                      } catch (urlError) {
-                        console.error("Invalid audio data URL:", urlError);
-                        document.getElementById('recordingStatus').textContent = "Received invalid audio data from server.";
-                      }
-                    } 
-                  } else {
-                    console.error('Server error:', response.statusText);
-                    document.getElementById('recordingStatus').textContent = "Sorry, there was an error processing your request.";
-                  }
-                } catch (error) {
-                  console.error('Error:', error);
-                  document.getElementById('recordingStatus').textContent = "Sorry, there was an error sending your audio.";
-                } 
+
+        async function sendAudioToServer(audioBlob) {
+          console.log("Пытаемся отправить аудио...");
+          const formData = new FormData();
+          formData.append('audio', audioBlob, 'audio.wav');
+
+          try {
+            const response = await fetch('http://127.0.0.1:5000/recognize_speech', {
+              method: 'POST',
+              body: formData
+            });
+
+            console.log("Статус ответа сервера:", response.status);
+
+            if (response.ok) {
+              const data = await response.json();
+              console.log("User speech:", data.user_speech);
+              console.log("Bot response:", data.bot_response);
+              console.log("Ответ сервера:", data);
+              console.log("audio_data:", data.audio_data);
+
+              if (data.user_speech) {
+                addMessage(data.user_speech, 'user');
               }
+              if (data.bot_response) {
+                addMessage(data.bot_response, 'response');
+              }
+
+              if (data.audio_data) {
+                try {
+                  new URL(data.audio_data);
+
+                  const audio = new Audio();
+                  audio.type = 'audio/mpeg';
+                  audio.src = data.audio_data;
+
+                  audio.oncanplaythrough = () => {
+                    audio.play().catch(error => {
+                      console.error("Error playing audio:", error);
+                      document.getElementById('recordingStatus').textContent = "Error playing audio response.";
+                    });
+                  };
+
+                  audio.onerror = (e) => {
+                    console.error("Error loading audio:", e);
+                    document.getElementById('recordingStatus').textContent = "Error loading audio response.";
+                  };
+                } catch (urlError) {
+                  console.error("Invalid audio data URL:", urlError);
+                  document.getElementById('recordingStatus').textContent = "Received invalid audio data from server.";
+                }
+              }
+            } else {
+              console.error('Ошибка сервера:', response.statusText);
+              document.getElementById('recordingStatus').textContent = "Извините, произошла ошибка при обработке запроса.";
+            }
+          } catch (error) {
+            console.error('Ошибка отправки запроса:', error);
+            document.getElementById('recordingStatus').textContent = "Извините, произошла ошибка при отправке аудио.";
+
+            // Добавьте эти строки:
+            if (error.response) {
+              console.error("Ответ сервера с ошибкой:", error.response.status, error.response.statusText);
+            }
+          }
+        }
             
             
             
