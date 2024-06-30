@@ -86,7 +86,8 @@
 </head>
 <body>
     <div id="phone">
-        <div id="display"></div>
+        <div id="display">
+            <p id="recordingStatus"></p> </div> 
         <button id="callButton">Начать звонок</button>
     </div>
 
@@ -159,7 +160,7 @@
                 formData.append('audio', audioBlob, 'audio.wav');
             
                 try {
-                    const response = await fetch('http://localhost:5000/recognize_speech', {
+                    const response = await fetch('http://localhost:5000/recognize_speech', { // Замените на адрес вашего сервера
                         method: 'POST',
                         body: formData
                     });
@@ -187,50 +188,37 @@
                                 audio.oncanplaythrough = () => {
                                     audio.play().catch(error => {
                                         console.error("Error playing audio:", error);
-                                        addMessage("Error playing audio response.", 'error');
+                                        document.getElementById('recordingStatus').textContent = "Error playing audio response.";
                                     });
                                 };
                                 
                                 audio.onerror = (e) => {
                                     console.error("Error loading audio:", e);
-                                    addMessage("Error loading audio response.", 'error');
+                                    document.getElementById('recordingStatus').textContent = "Error loading audio response.";
                                 };
                             } catch (urlError) {
                                 console.error("Invalid audio data URL:", urlError);
-                                addMessage("Received invalid audio data from server.", 'error');
+                                document.getElementById('recordingStatus').textContent = "Received invalid audio data from server.";
                             }
                         }
                     } else {
                         console.error('Server error:', response.statusText);
-                        addMessage("Sorry, there was an error processing your request.", 'error');
+                        document.getElementById('recordingStatus').textContent = "Sorry, there was an error processing your request.";
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    addMessage("Sorry, there was an error sending your audio.", 'error');
-                } finally {
-                    // Очищаем сообщение о записи
-                    const recordingStatus = document.getElementById('recordingStatus');
-                    if (recordingStatus) {
-                        recordingStatus.textContent = '';
-                    } else {
-                        console.warn("Element with id 'recordingStatus' not found");
-                    }
-                }
+                    document.getElementById('recordingStatus').textContent = "Sorry, there was an error sending your audio.";
+                } 
             }
             
             
             
             function addMessage(message, type) {
-                const chatBox = document.getElementById('chatBox');
-                if (chatBox) {
-                    const messageElement = document.createElement('div');
-                    messageElement.classList.add(type);
-                    messageElement.textContent = message;
-                    chatBox.appendChild(messageElement);
-                    chatBox.scrollTop = chatBox.scrollHeight;
-                } else {
-                    console.warn("Element with id 'chatBox' not found");
-                }
+                const messageElement = document.createElement('p');
+                messageElement.classList.add(type);
+                messageElement.textContent = message;
+                display.appendChild(messageElement);
+                display.scrollTop = display.scrollHeight;
             }
             
 
