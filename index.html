@@ -169,12 +169,36 @@
                         console.log("User speech:", data.user_speech);
                         console.log("Bot response:", data.bot_response);
                         
-                        addMessage(data.user_speech, 'user');
-                        addMessage(data.bot_response, 'response');
+                        if (data.user_speech) {
+                            addMessage(data.user_speech, 'user');
+                        }
+                        if (data.bot_response) {
+                            addMessage(data.bot_response, 'response');
+                        }
                         
                         if (data.audio_data) {
-                            const audio = new Audio(data.audio_data);
-                            audio.play().catch(error => console.error("Error playing audio:", error));
+                            try {
+                                // Проверяем, является ли audio_data корректным URL
+                                new URL(data.audio_data);
+                                
+                                const audio = new Audio();
+                                audio.src = data.audio_data;
+                                
+                                audio.oncanplaythrough = () => {
+                                    audio.play().catch(error => {
+                                        console.error("Error playing audio:", error);
+                                        addMessage("Error playing audio response.", 'error');
+                                    });
+                                };
+                                
+                                audio.onerror = (e) => {
+                                    console.error("Error loading audio:", e);
+                                    addMessage("Error loading audio response.", 'error');
+                                };
+                            } catch (urlError) {
+                                console.error("Invalid audio data URL:", urlError);
+                                addMessage("Received invalid audio data from server.", 'error');
+                            }
                         }
                     } else {
                         console.error('Server error:', response.statusText);
@@ -183,20 +207,32 @@
                 } catch (error) {
                     console.error('Error:', error);
                     addMessage("Sorry, there was an error sending your audio.", 'error');
+                } finally {
+                    // Очищаем сообщение о записи
+                    const recordingStatus = document.getElementById('recordingStatus');
+                    if (recordingStatus) {
+                        recordingStatus.textContent = '';
+                    } else {
+                        console.warn("Element with id 'recordingStatus' not found");
+                    }
                 }
-            
-                // Очищаем сообщение о записи
-                document.getElementById('recordingStatus').textContent = '';
             }
+            
+            
             
             function addMessage(message, type) {
-                let p = document.createElement('p');
-                p.textContent = type === 'response' ? 'Собеседник: ' + message : 
-                                type === 'user' ? 'Вы: ' + message : message;
-                p.className = type;
-                display.appendChild(p);
-                display.scrollTop = display.scrollHeight;
+                const chatBox = document.getElementById('chatBox');
+                if (chatBox) {
+                    const messageElement = document.createElement('div');
+                    messageElement.classList.add(type);
+                    messageElement.textContent = message;
+                    chatBox.appendChild(messageElement);
+                    chatBox.scrollTop = chatBox.scrollHeight;
+                } else {
+                    console.warn("Element with id 'chatBox' not found");
+                }
             }
+            
 
             function logMessage(message) {
                 console.log(message);
