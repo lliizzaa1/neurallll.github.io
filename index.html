@@ -169,6 +169,8 @@
                         const data = await response.json();
                         console.log("User speech:", data.user_speech);
                         console.log("Bot response:", data.bot_response);
+                        console.log("Ответ сервера:", data);
+                        console.log("audio_data:", data.audio_data);
                         
                         if (data.user_speech) {
                             addMessage(data.user_speech, 'user');
