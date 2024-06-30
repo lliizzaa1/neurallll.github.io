@@ -93,106 +93,109 @@
     </div>
 
     <script>
-        function initApp() {
-            let tg = window.Telegram.WebApp;
-            let callButton = document.getElementById('callButton');
-            let display = document.getElementById('display');
-            let isCallActive = false;
-            let isTelegramWebApp = tg.initDataUnsafe.query_id !== undefined;
-            let recorder;
-            let audioBlob;
-            let silenceTimer = null;
-            const SILENCE_THRESHOLD = 1000; // Порог паузы в миллисекундах
+      function initApp() {
+        let tg = window.Telegram.WebApp;
+        let callButton = document.getElementById('callButton');
+        let display = document.getElementById('display');
+        let isCallActive = false;
+        let isTelegramWebApp = tg.initDataUnsafe.query_id !== undefined;
+        let recorder;
+        let audioBlob;
+        let silenceTimer = null;
+        const SILENCE_THRESHOLD = 1500; // Порог паузы в миллисекундах
 
-            console.log('Is Telegram WebApp:', isTelegramWebApp);
-            logMessage('App initialized. Is Telegram WebApp: ' + isTelegramWebApp);
+        console.log('Is Telegram WebApp:', isTelegramWebApp);
+        logMessage('App initialized. Is Telegram WebApp: ' + isTelegramWebApp);
 
-            tg.expand();
+        tg.expand();
 
-            callButton.addEventListener('click', toggleCall);
+        callButton.addEventListener('click', toggleCall);
 
-            function toggleCall() {
-                if (isCallActive) {
-                    endCall();
-                } else {
-                    startCall();
-                }
+        function toggleCall() {
+          if (isCallActive) {
+            endCall(false); // false - не отправлять по таймеру
+          } else {
+            startCall();
+          }
+        }
+
+        async function startCall() {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            recorder = RecordRTC(stream, {
+              type: 'audio',
+              mimeType: 'audio/wav',
+              recorderType: RecordRTC.StereoAudioRecorder
+            });
+
+            recorder.startRecording();
+            isCallActive = true;
+            callButton.textContent = 'Завершить звонок';
+            addMessage('Звонок начат. Говорите...', 'system');
+            logMessage('Call started');
+            if (isTelegramWebApp) {
+              tg.sendData(JSON.stringify({ action: 'startCall' }));
             }
 
-            async function startCall() {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    recorder = RecordRTC(stream, {
-                        type: 'audio',
-                        mimeType: 'audio/wav',
-                        recorderType: RecordRTC.StereoAudioRecorder
-                    });
+            recorder.ondataavailable = function (blob) {
+              const audioContext = new AudioContext();
+              const fileReader = new FileReader();
 
-                    recorder.startRecording();
-                    isCallActive = true;
-                    callButton.textContent = 'Завершить звонок';
-                    addMessage('Звонок начат. Говорите...', 'system');
-                    logMessage('Call started');
-                    if (isTelegramWebApp) {
-                        tg.sendData(JSON.stringify({action: 'startCall'}));
+              fileReader.onloadend = () => {
+                audioContext.decodeAudioData(fileReader.result, (buffer) => {
+                  const data = buffer.getChannelData(0);
+                  const volume = getRMS(data);
+
+                  if (volume < 0.01) {
+                    if (!silenceTimer) {
+                      silenceTimer = setTimeout(() => {
+                        endCall(true); // true - отправлять по таймеру
+                      }, SILENCE_THRESHOLD);
                     }
+                  } else {
+                    clearTimeout(silenceTimer);
+                    silenceTimer = null;
+                  }
+                });
+              };
 
-                    recorder.ondataavailable = function(blob) {
-                        const audioContext = new AudioContext();
-                        const fileReader = new FileReader();
+              fileReader.readAsArrayBuffer(blob);
+            };
 
-                        fileReader.onloadend = () => {
-                            audioContext.decodeAudioData(fileReader.result, (buffer) => {
-                                const data = buffer.getChannelData(0);
-                                const volume = getRMS(data); 
+          } catch (err) {
+            console.error('Error accessing microphone:', err);
+            addMessage('Ошибка доступа к микрофону', 'error');
+          }
+        }
 
-                                if (volume < 0.05) { 
-                                    if (!silenceTimer) {
-                                        silenceTimer = setTimeout(() => {
-                                            recorder.stopRecording(() => {  // Останавливаем запись перед отправкой
-                                                audioBlob = recorder.getBlob();
-                                                sendAudioToServer(audioBlob);
-                                            });
-                                        }, SILENCE_THRESHOLD);
-                                    }
-                                } else {
-                                    clearTimeout(silenceTimer);
-                                    silenceTimer = null;
-                                }
-                            });
-                        };
-
-                        fileReader.readAsArrayBuffer(blob);
-                    };
-
-                } catch (err) {
-                    console.error('Error accessing microphone:', err);
-                    addMessage('Ошибка доступа к микрофону', 'error');
-                }
+        function endCall(isSilenceTimeout) {
+          if (recorder) {
+            recorder.stopRecording(() => {
+              audioBlob = recorder.getBlob();
+              if (isSilenceTimeout) {
+                sendAudioToServer(audioBlob); 
+              }
+            });
+          }
+          
+          if (!isSilenceTimeout) { // Только если вызов не по таймеру
+            isCallActive = false;
+            callButton.textContent = 'Начать звонок';
+            addMessage('Звонок завершен', 'system');
+            logMessage('Call ended');
+            if (isTelegramWebApp) {
+              tg.sendData(JSON.stringify({ action: 'endCall' }));
             }
+          }
+        }
 
-            function endCall() {
-                if (recorder) {
-                    recorder.stopRecording(() => {
-                        audioBlob = recorder.getBlob();
-                        sendAudioToServer(audioBlob);
-                    });
-                }
-                isCallActive = false;
-                callButton.textContent = 'Начать звонок';
-                addMessage('Звонок завершен', 'system');
-                logMessage('Call ended');
-                if (isTelegramWebApp) {
-                    tg.sendData(JSON.stringify({action: 'endCall'}));
-                }
-            }
 
-            async function sendAudioToServer(audioBlob) {
+        async function sendAudioToServer(audioBlob) {
                 const formData = new FormData();
                 formData.append('audio', audioBlob, 'audio.wav');
               
                 try {
-                  const response = await fetch('http://127.0.0.1:5000/recognize_speech', { // Замени на адрес твоего сервера
+                  const response = await fetch('http://127.0.0.1:5000/recognize_speech', { 
                     method: 'POST',
                     body: formData
                   });
