@@ -160,7 +160,7 @@
                 formData.append('audio', audioBlob, 'audio.wav');
               
                 try {
-                  const response = await fetch('http://localhost:5000/recognize_speech', { // Замени на адрес твоего сервера
+                  const response = await fetch('http://127.0.0.1:5000/recognize_speech', { // Замени на адрес твоего сервера
                     method: 'POST',
                     body: formData
                   });
