@@ -146,10 +146,13 @@
                                 const data = buffer.getChannelData(0);
                                 const volume = getRMS(data); 
 
-                                if (volume < 0.01) { 
+                                if (volume < 0.05) { 
                                     if (!silenceTimer) {
                                         silenceTimer = setTimeout(() => {
-                                            endCall(); 
+                                            recorder.stopRecording(() => {  // Останавливаем запись перед отправкой
+                                                audioBlob = recorder.getBlob();
+                                                sendAudioToServer(audioBlob);
+                                            });
                                         }, SILENCE_THRESHOLD);
                                     }
                                 } else {
