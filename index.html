@@ -158,60 +158,60 @@
             async function sendAudioToServer(audioBlob) {
                 const formData = new FormData();
                 formData.append('audio', audioBlob, 'audio.wav');
-            
+              
                 try {
-                    const response = await fetch('http://localhost:5000/recognize_speech', { // Замените на адрес вашего сервера
-                        method: 'POST',
-                        body: formData
-                    });
-            
-                    if (response.ok) {
-                        const data = await response.json();
-                        console.log("User speech:", data.user_speech);
-                        console.log("Bot response:", data.bot_response);
-                        console.log("Ответ сервера:", data);
-                        console.log("audio_data:", data.audio_data);
-                        
-                        if (data.user_speech) {
-                            addMessage(data.user_speech, 'user');
-                        }
-                        if (data.bot_response) {
-                            addMessage(data.bot_response, 'response');
-                        }
-                        
-                        if (data.audio_data) {
-                            try {
-                                // Проверяем, является ли audio_data корректным URL
-                                new URL(data.audio_data);
-                                
-                                const audio = new Audio();
-                                audio.src = data.audio_data;
-                                
-                                audio.oncanplaythrough = () => {
-                                    audio.play().catch(error => {
-                                        console.error("Error playing audio:", error);
-                                        document.getElementById('recordingStatus').textContent = "Error playing audio response.";
-                                    });
-                                };
-                                
-                                audio.onerror = (e) => {
-                                    console.error("Error loading audio:", e);
-                                    document.getElementById('recordingStatus').textContent = "Error loading audio response.";
-                                };
-                            } catch (urlError) {
-                                console.error("Invalid audio data URL:", urlError);
-                                document.getElementById('recordingStatus').textContent = "Received invalid audio data from server.";
-                            }
-                        }
-                    } else {
-                        console.error('Server error:', response.statusText);
-                        document.getElementById('recordingStatus').textContent = "Sorry, there was an error processing your request.";
+                  const response = await fetch('http://localhost:5000/recognize_speech', { // Замени на адрес твоего сервера
+                    method: 'POST',
+                    body: formData
+                  });
+              
+                  if (response.ok) {
+                    const data = await response.json();
+                    console.log("User speech:", data.user_speech);
+                    console.log("Bot response:", data.bot_response);
+                    console.log("Ответ сервера:", data);
+                    console.log("audio_data:", data.audio_data);
+              
+                    if (data.user_speech) {
+                      addMessage(data.user_speech, 'user');
                     }
+                    if (data.bot_response) {
+                      addMessage(data.bot_response, 'response');
+                    }
+              
+                    if (data.audio_data) {
+                      try {
+                        new URL(data.audio_data);
+              
+                        const audio = new Audio();
+                        audio.type = 'audio/wav'; // Указываем MIME-тип WAV
+                        audio.src = data.audio_data;
+              
+                        audio.oncanplaythrough = () => {
+                          audio.play().catch(error => {
+                            console.error("Error playing audio:", error);
+                            document.getElementById('recordingStatus').textContent = "Error playing audio response.";
+                          });
+                        };
+              
+                        audio.onerror = (e) => {
+                          console.error("Error loading audio:", e);
+                          document.getElementById('recordingStatus').textContent = "Error loading audio response.";
+                        };
+                      } catch (urlError) {
+                        console.error("Invalid audio data URL:", urlError);
+                        document.getElementById('recordingStatus').textContent = "Received invalid audio data from server.";
+                      }
+                    } 
+                  } else {
+                    console.error('Server error:', response.statusText);
+                    document.getElementById('recordingStatus').textContent = "Sorry, there was an error processing your request.";
+                  }
                 } catch (error) {
-                    console.error('Error:', error);
-                    document.getElementById('recordingStatus').textContent = "Sorry, there was an error sending your audio.";
+                  console.error('Error:', error);
+                  document.getElementById('recordingStatus').textContent = "Sorry, there was an error sending your audio.";
                 } 
-            }
+              }
             
             
             
