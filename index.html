@@ -167,29 +167,18 @@
                     const data = await response.json();
             
                     if (response.ok) {
+                        const data = await response.json();
                         console.log("User speech:", data.user_speech);
                         console.log("Bot response:", data.bot_response);
                         
-                        // Добавление сообщений пользователя и бота в интерфейс
                         addMessage(data.user_speech, 'user');
                         addMessage(data.bot_response, 'response');
                         
-                        // Автоматическое воспроизведение аудио ответа
-                        const audio = new Audio(`http://localhost:5000${data.audio_url}`);
-
-                        // Ждем, пока аудио загрузится
-                        audio.addEventListener('canplaythrough', () => {
-                            audio.play();
-                            console.log("Аудио начало воспроизводиться"); // Добавьте эту строку
-                        }, false);
-
-                        // Обработка ошибок загрузки и воспроизведения
-                        audio.addEventListener('error', (error) => {
-                            console.error("Ошибка при загрузке или воспроизведении аудио:", error);
-                            // Добавьте обработку ошибки, например, выведите сообщение об ошибке пользователю
-                        }); 
-
-                    } else {
+                        // Создаем и воспроизводим аудио из Data URL
+                        const audio = new Audio(data.audio_data);
+                        audio.play().catch(error => console.error("Error playing audio:", error));
+                    }
+               else {
                         console.error("Error:", data.error);
                         addMessage(data.error, 'error');
                     }
