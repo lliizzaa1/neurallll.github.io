@@ -87,7 +87,8 @@
 <body>
     <div id="phone">
         <div id="display">
-            <p id="recordingStatus"></p> </div> 
+            <p id="recordingStatus"></p> 
+        </div> 
         <button id="callButton">Начать звонок</button>
     </div>
 
@@ -100,6 +101,8 @@
             let isTelegramWebApp = tg.initDataUnsafe.query_id !== undefined;
             let recorder;
             let audioBlob;
+            let silenceTimer = null;
+            const SILENCE_THRESHOLD = 1500; // Порог паузы в миллисекундах
 
             console.log('Is Telegram WebApp:', isTelegramWebApp);
             logMessage('App initialized. Is Telegram WebApp: ' + isTelegramWebApp);
@@ -124,7 +127,7 @@
                         mimeType: 'audio/wav',
                         recorderType: RecordRTC.StereoAudioRecorder
                     });
-                    
+
                     recorder.startRecording();
                     isCallActive = true;
                     callButton.textContent = 'Завершить звонок';
@@ -133,6 +136,32 @@
                     if (isTelegramWebApp) {
                         tg.sendData(JSON.stringify({action: 'startCall'}));
                     }
+
+                    recorder.ondataavailable = function(blob) {
+                        const audioContext = new AudioContext();
+                        const fileReader = new FileReader();
+
+                        fileReader.onloadend = () => {
+                            audioContext.decodeAudioData(fileReader.result, (buffer) => {
+                                const data = buffer.getChannelData(0);
+                                const volume = getRMS(data); 
+
+                                if (volume < 0.01) { 
+                                    if (!silenceTimer) {
+                                        silenceTimer = setTimeout(() => {
+                                            endCall(); 
+                                        }, SILENCE_THRESHOLD);
+                                    }
+                                } else {
+                                    clearTimeout(silenceTimer);
+                                    silenceTimer = null;
+                                }
+                            });
+                        };
+
+                        fileReader.readAsArrayBuffer(blob);
+                    };
+
                 } catch (err) {
                     console.error('Error accessing microphone:', err);
                     addMessage('Ошибка доступа к микрофону', 'error');
@@ -214,7 +243,7 @@
               }
             
             
-            
+
             function addMessage(message, type) {
                 const messageElement = document.createElement('p');
                 messageElement.classList.add(type);
@@ -222,13 +251,20 @@
                 display.appendChild(messageElement);
                 display.scrollTop = display.scrollHeight;
             }
-            
 
             function logMessage(message) {
                 console.log(message);
                 if (isTelegramWebApp) {
                     tg.sendData(JSON.stringify({action: 'log', message: message}));
                 }
+            }
+
+            function getRMS(data) { 
+                let sumOfSquares = 0;
+                for (let i = 0; i < data.length; i++) {
+                    sumOfSquares += data[i] * data[i];
+                }
+                return Math.sqrt(sumOfSquares / data.length);
             }
 
             tg.ready();
