@@ -104,6 +104,8 @@
         let isRecording = false;
         let silenceTimer;
         let isPlayingResponse = false;
+        let silenceDetectionInterval;
+
         const SILENCE_THRESHOLD = 1000; // 1 секунда тишины
 
         console.log('Is Telegram WebApp:', isTelegramWebApp);
@@ -120,30 +122,32 @@
             startCall();
           }
         }
-
-        async function startCall() {
-          try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            recorder = RecordRTC(stream, {
-              type: 'audio',
-              mimeType: 'audio/wav',
-              recorderType: RecordRTC.StereoAudioRecorder
-            });
         
-            isCallActive = true;
-            callButton.textContent = 'Завершить звонок';
-            addMessage('Звонок начат. Говорите...', 'system');
-            logMessage('Call started');
-            if (isTelegramWebApp) {
-              tg.sendData(JSON.stringify({ action: 'startCall' }));
-            }
-        
-            startSilenceDetection(stream);
-        
-          } catch (err) {
-            console.error('Error accessing microphone:', err);
-            addMessage('Ошибка доступа к микрофону', 'error');
+        function resumeListening() {
+          if (isCallActive && !isRecording) {
+            console.log("Возобновляем прослушивание");
+            startSilenceDetection(currentStream);
           }
+        }
+
+        function startCall() {
+          if (isCallActive) return;
+        
+          isCallActive = true;
+          document.getElementById('startCall').disabled = true;
+          document.getElementById('endCall').disabled = false;
+          document.getElementById('recordingStatus').textContent = "Звонок активен. Говорите...";
+        
+          navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+              currentStream = stream;
+              startSilenceDetection(stream);
+            })
+            .catch(error => {
+              console.error('Error accessing the microphone:', error);
+              document.getElementById('recordingStatus').textContent = "Error: Could not access the microphone.";
+              endCall();
+            });
         }
         
         function endCall() {
@@ -180,76 +184,65 @@
         }
 
         async function sendAudioToServer(audioBlob) {
-          console.log("Пытаемся отправить аудио...");
           const formData = new FormData();
-          formData.append('audio', audioBlob, 'audio.wav');
+          formData.append('audio', audioBlob, 'recording.wav');
         
           try {
-            const response = await fetch('http://127.0.0.1:5000/recognize_speech', {
+            const response = await fetch('/process_audio', {
               method: 'POST',
               body: formData
             });
         
-            console.log("Статус ответа сервера:", response.status);
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
         
-            if (response.ok) {
-              const data = await response.json();
-              console.log("User speech:", data.user_speech);
-              console.log("Bot response:", data.bot_response);
-              console.log("Ответ сервера:", data);
-              console.log("audio_data:", data.audio_data);
+            const data = await response.json();
+            console.log("Server response:", data);
         
-              if (data.user_speech) {
-                addMessage(data.user_speech, 'user');
+            document.getElementById('recordingStatus').textContent = data.text;
+        
+            if (data.audio_data) {
+              try {
+                new URL(data.audio_data);
+        
+                const audio = new Audio();
+                audio.type = 'audio/mpeg';
+                audio.src = data.audio_data;
+        
+                isPlayingResponse = true;
+        
+                audio.oncanplaythrough = () => {
+                  audio.play().catch(error => {
+                    console.error("Error playing audio:", error);
+                    document.getElementById('recordingStatus').textContent = "Error playing audio response.";
+                    isPlayingResponse = false;
+                    resumeListening();
+                  });
+                };
+        
+                audio.onended = () => {
+                  isPlayingResponse = false;
+                  console.log("Аудио ответ закончился, можно начинать новую запись");
+                  resumeListening();
+                };
+        
+                audio.onerror = (e) => {
+                  console.error("Error loading audio:", e);
+                  document.getElementById('recordingStatus').textContent = "Error loading audio response.";
+                  isPlayingResponse = false;
+                  resumeListening();
+                };
+              } catch (urlError) {
+                console.error("Invalid audio data URL:", urlError);
+                document.getElementById('recordingStatus').textContent = "Received invalid audio data from server.";
+                resumeListening();
               }
-              if (data.bot_response) {
-                addMessage(data.bot_response, 'response');
-              }
-        
-              if (data.audio_data) {
-                try {
-                  new URL(data.audio_data);
-        
-                  const audio = new Audio();
-                  audio.type = 'audio/mpeg';
-                  audio.src = data.audio_data;
-        
-                  isPlayingResponse = true;  // Устанавливаем флаг воспроизведения
-        
-                  audio.oncanplaythrough = () => {
-                    audio.play().catch(error => {
-                      console.error("Error playing audio:", error);
-                      document.getElementById('recordingStatus').textContent = "Error playing audio response.";
-                      isPlayingResponse = false;  // Сбрасываем флаг в случае ошибки
-                    });
-                  };
-        
-                  audio.onended = () => {
-                    isPlayingResponse = false;  // Сбрасываем флаг после окончания воспроизведения
-                    console.log("Аудио ответ закончился, можно начинать новую запись");
-                  };
-        
-                  audio.onerror = (e) => {
-                    console.error("Error loading audio:", e);
-                    document.getElementById('recordingStatus').textContent = "Error loading audio response.";
-                    isPlayingResponse = false;  // Сбрасываем флаг в случае ошибки
-                  };
-                } catch (urlError) {
-                  console.error("Invalid audio data URL:", urlError);
-                  document.getElementById('recordingStatus').textContent = "Received invalid audio data from server.";
-                }
-              }
-            } else {
-              console.error('Ошибка сервера:', response.statusText);
-              document.getElementById('recordingStatus').textContent = "Извините, произошла ошибка при обработке запроса.";
             }
           } catch (error) {
-            console.error('Ошибка отправки запроса:', error);
-            document.getElementById('recordingStatus').textContent = "Извините, произошла ошибка при отправке аудио.";
-        
-            if (error.response) {
-              console.error("Ответ сервера с ошибкой:", error.response.status, error.response.statusText);
-            }
+            console.error('Error sending audio to server:', error);
+            document.getElementById('recordingStatus').textContent = "Error: Could not send audio to server.";
+            resumeListening();
           }
         }
         
@@ -283,7 +276,16 @@
           const NOISE_THRESHOLD = 10; // Уровень шума, ниже которого считается тишиной
         
           function checkSilence() {
-            if (!isCallActive || isPlayingResponse) return; // Прекратить проверку, если звонок завершен или воспроизводится ответ
+            if (!isCallActive) {
+              console.log("Звонок завершен, останавливаем проверку тишины");
+              clearInterval(silenceDetectionInterval);
+              return;
+            }
+        
+            if (isPlayingResponse) {
+              console.log("Воспроизводится ответ, ожидаем...");
+              return;
+            }
         
             analyser.getByteFrequencyData(dataArray);
             const average = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
@@ -300,16 +302,14 @@
               }
             } else {
               silenceStart = null;
-              if (!isRecording && !isPlayingResponse) {
+              if (!isRecording) {
                 console.log("Обнаружен звук, начинаем запись");
                 startRecording();
               }
             }
-        
-            requestAnimationFrame(checkSilence);
           }
         
-          checkSilence();
+          silenceDetectionInterval = setInterval(checkSilence, 100);
         }
                 
 
