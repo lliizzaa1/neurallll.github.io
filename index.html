@@ -126,34 +126,40 @@
         function resumeListening() {
           if (isCallActive && !isRecording) {
             console.log("Возобновляем прослушивание");
+            initializeRecorder(currentStream);
             startSilenceDetection(currentStream);
           }
         }
+        
 
         function startCall() {
           if (isCallActive) return;
         
           isCallActive = true;
-          document.getElementById('startCall').disabled = true;
-          document.getElementById('endCall').disabled = false;
-          document.getElementById('recordingStatus').textContent = "Звонок активен. Говорите...";
+          callButton.textContent = 'Завершить звонок';
+          addMessage('Звонок начат', 'system');
         
           navigator.mediaDevices.getUserMedia({ audio: true })
             .then(stream => {
               currentStream = stream;
+              initializeRecorder(stream);
               startSilenceDetection(stream);
             })
             .catch(error => {
               console.error('Error accessing the microphone:', error);
-              document.getElementById('recordingStatus').textContent = "Error: Could not access the microphone.";
+              addMessage('Ошибка: Не удалось получить доступ к микрофону', 'error');
               endCall();
             });
         }
+        
         
         function endCall() {
           isCallActive = false;
           if (isRecording) {
             stopRecordingAndSend();
+          }
+          if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
           }
           callButton.textContent = 'Начать звонок';
           addMessage('Звонок завершен', 'system');
@@ -166,12 +172,23 @@
             clearTimeout(silenceTimer);
             silenceTimer = null;
           }
+          
+          if (silenceDetectionInterval) {
+            clearInterval(silenceDetectionInterval);
+          }
         }
-
+        
         function startRecording() {
           isRecording = true;
           recorder.startRecording();
           console.log("Запись начата");
+        }
+
+        function initializeRecorder(stream) {
+          recorder = new RecordRTC(stream, {
+            type: 'audio',
+            mimeType: 'audio/webm'
+          });
         }
 
         function stopRecordingAndSend() {
@@ -217,6 +234,7 @@
                     console.error("Error playing audio:", error);
                     document.getElementById('recordingStatus').textContent = "Error playing audio response.";
                     isPlayingResponse = false;
+                    initializeRecorder(currentStream);
                     resumeListening();
                   });
                 };
@@ -224,6 +242,7 @@
                 audio.onended = () => {
                   isPlayingResponse = false;
                   console.log("Аудио ответ закончился, можно начинать новую запись");
+                  initializeRecorder(currentStream);
                   resumeListening();
                 };
         
@@ -231,17 +250,20 @@
                   console.error("Error loading audio:", e);
                   document.getElementById('recordingStatus').textContent = "Error loading audio response.";
                   isPlayingResponse = false;
+                  initializeRecorder(currentStream);
                   resumeListening();
                 };
               } catch (urlError) {
                 console.error("Invalid audio data URL:", urlError);
                 document.getElementById('recordingStatus').textContent = "Received invalid audio data from server.";
+                initializeRecorder(currentStream);
                 resumeListening();
               }
             }
           } catch (error) {
             console.error('Error sending audio to server:', error);
             document.getElementById('recordingStatus').textContent = "Error: Could not send audio to server.";
+            initializeRecorder(currentStream);
             resumeListening();
           }
         }
