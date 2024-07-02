@@ -125,7 +125,7 @@
               mimeType: 'audio/wav',
               recorderType: RecordRTC.StereoAudioRecorder
             });
-
+        
             recorder.startRecording();
             isCallActive = true;
             callButton.textContent = 'Завершить звонок';
@@ -134,12 +134,15 @@
             if (isTelegramWebApp) {
               tg.sendData(JSON.stringify({ action: 'startCall' }));
             }
-
+        
+            startSilenceDetection(stream);
+        
           } catch (err) {
             console.error('Error accessing microphone:', err);
             addMessage('Ошибка доступа к микрофону', 'error');
           }
         }
+        
 
         function endCall() {
           if (recorder) {
@@ -155,7 +158,13 @@
           if (isTelegramWebApp) {
             tg.sendData(JSON.stringify({ action: 'endCall' }));
           }
+          
+          if (silenceTimer) {
+            clearTimeout(silenceTimer);
+            silenceTimer = null;
+          }
         }
+        
 
 
         async function sendAudioToServer(audioBlob) {
@@ -244,7 +253,39 @@
 
             tg.ready();
         }
-
+        let silenceTimer;
+        const SILENCE_THRESHOLD = 1000; // 1 секунда тишины
+        
+        function startSilenceDetection(stream) {
+          const audioContext = new AudioContext();
+          const analyser = audioContext.createAnalyser();
+          const microphone = audioContext.createMediaStreamSource(stream);
+          microphone.connect(analyser);
+          analyser.fftSize = 2048;
+          const bufferLength = analyser.frequencyBinCount;
+          const dataArray = new Uint8Array(bufferLength);
+        
+          function checkSilence() {
+            analyser.getByteFrequencyData(dataArray);
+            const sum = dataArray.reduce((a, b) => a + b, 0);
+            if (sum === 0) {
+              if (!silenceTimer) {
+                silenceTimer = setTimeout(() => {
+                  endCall();
+                }, SILENCE_THRESHOLD);
+              }
+            } else {
+              if (silenceTimer) {
+                clearTimeout(silenceTimer);
+                silenceTimer = null;
+              }
+            }
+            requestAnimationFrame(checkSilence);
+          }
+        
+          checkSilence();
+        }
+        
         initApp();
     </script>
 </body>
