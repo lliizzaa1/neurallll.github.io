@@ -180,7 +180,7 @@
         function initializeRecorder(stream) {
           recorder = new RecordRTC(stream, {
             type: 'audio',
-            mimeType: 'audio/webm'
+            mimeType: 'audio/wav'
           });
         }
 
@@ -195,7 +195,7 @@
 
         async function sendAudioToServer(audioBlob) {
           const formData = new FormData();
-          formData.append('audio', audioBlob, 'recording.webm');
+          formData.append('audio', audioBlob, 'recording.wav');
         
           try {
             console.log("Отправка аудио на сервер...");
