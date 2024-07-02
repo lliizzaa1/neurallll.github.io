@@ -267,33 +267,39 @@
           const bufferLength = analyser.frequencyBinCount;
           const dataArray = new Uint8Array(bufferLength);
         
+          let silenceStart = null;
+          const SILENCE_DURATION = 1000; // 1 секунда тишины
+          const NOISE_THRESHOLD = 10; // Уровень шума, ниже которого считается тишиной
+        
           function checkSilence() {
             if (!isCallActive) return; // Прекратить проверку, если звонок завершен
-
+        
             analyser.getByteFrequencyData(dataArray);
-            const sum = dataArray.reduce((a, b) => a + b, 0);
-            if (sum === 0) {
-              if (!silenceTimer) {
-                silenceTimer = setTimeout(() => {
-                  if (isRecording) {
-                    stopRecordingAndSend();
-                  }
-                }, SILENCE_THRESHOLD);
+            const average = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
+        
+            if (average < NOISE_THRESHOLD) {
+              if (!silenceStart) {
+                silenceStart = Date.now();
+              } else if (Date.now() - silenceStart > SILENCE_DURATION) {
+                if (isRecording) {
+                  console.log("Обнаружена тишина, останавливаем запись");
+                  stopRecordingAndSend();
+                  silenceStart = null;
+                }
               }
             } else {
-              if (silenceTimer) {
-                clearTimeout(silenceTimer);
-                silenceTimer = null;
-              }
+              silenceStart = null;
               if (!isRecording) {
+                console.log("Обнаружен звук, начинаем запись");
                 startRecording();
               }
             }
+        
             requestAnimationFrame(checkSilence);
           }
         
           checkSilence();
-        }
+        }        
 
         tg.ready();
       }
