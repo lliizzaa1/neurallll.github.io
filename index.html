@@ -195,26 +195,31 @@
 
         async function sendAudioToServer(audioBlob) {
           const formData = new FormData();
-          formData.append('audio', audioBlob, 'recording.wav');
+          formData.append('audio', audioBlob, 'recording.webm');
         
           try {
+            console.log("Отправка аудио на сервер...");
             const response = await fetch('http://127.0.0.1:5000/recognize_speech', {
               method: 'POST',
               body: formData
             });
         
+            console.log("Получен ответ от сервера. Статус:", response.status);
+        
             if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
+              const errorText = await response.text();
+              throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
             }
         
             const data = await response.json();
-            console.log("Server response:", data);
+            console.log("Успешно получен ответ от сервера:", data);
         
-            document.getElementById('recordingStatus').textContent = data.text;
+            document.getElementById('recordingStatus').textContent = data.text || "Получен ответ от сервера";
         
             if (data.audio_data) {
               try {
-                new URL(data.audio_data);
+                console.log("Попытка воспроизведения аудио ответа...");
+                new URL(data.audio_data); // Проверка валидности URL
         
                 const audio = new Audio();
                 audio.type = 'audio/mpeg';
@@ -223,38 +228,43 @@
                 isPlayingResponse = true;
         
                 audio.oncanplaythrough = () => {
+                  console.log("Аудио готово к воспроизведению");
                   audio.play().catch(error => {
-                    console.error("Error playing audio:", error);
-                    document.getElementById('recordingStatus').textContent = "Error playing audio response.";
+                    console.error("Ошибка воспроизведения аудио:", error);
+                    document.getElementById('recordingStatus').textContent = "Ошибка воспроизведения аудио ответа.";
                     isPlayingResponse = false;
                     resumeListening();
                   });
                 };
         
                 audio.onended = () => {
+                  console.log("Воспроизведение аудио ответа завершено");
                   isPlayingResponse = false;
-                  console.log("Аудио ответ закончился, можно начинать новую запись");
                   resumeListening();
                 };
         
                 audio.onerror = (e) => {
-                  console.error("Error loading audio:", e);
-                  document.getElementById('recordingStatus').textContent = "Error loading audio response.";
+                  console.error("Ошибка загрузки аудио:", e);
+                  document.getElementById('recordingStatus').textContent = "Ошибка загрузки аудио ответа.";
                   isPlayingResponse = false;
                   resumeListening();
                 };
               } catch (urlError) {
-                console.error("Invalid audio data URL:", urlError);
-                document.getElementById('recordingStatus').textContent = "Received invalid audio data from server.";
+                console.error("Некорректный URL аудио данных:", urlError);
+                document.getElementById('recordingStatus').textContent = "Получены некорректные аудио данные от сервера.";
                 resumeListening();
               }
+            } else {
+              console.log("Аудио данные отсутствуют в ответе сервера");
+              resumeListening();
             }
           } catch (error) {
-            console.error('Error sending audio to server:', error);
-            document.getElementById('recordingStatus').textContent = "Error: Could not send audio to server.";
+            console.error('Ошибка отправки аудио на сервер:', error);
+            document.getElementById('recordingStatus').textContent = `Ошибка: ${error.message}`;
             resumeListening();
           }
         }
+        
         
             
         function addMessage(message, type) {
