@@ -103,6 +103,7 @@
         let audioBlob;
         let isRecording = false;
         let silenceTimer;
+        let isPlayingResponse = false;
         const SILENCE_THRESHOLD = 1000; // 1 секунда тишины
 
         console.log('Is Telegram WebApp:', isTelegramWebApp);
@@ -182,47 +183,56 @@
           console.log("Пытаемся отправить аудио...");
           const formData = new FormData();
           formData.append('audio', audioBlob, 'audio.wav');
-
+        
           try {
             const response = await fetch('http://127.0.0.1:5000/recognize_speech', {
               method: 'POST',
               body: formData
             });
-
+        
             console.log("Статус ответа сервера:", response.status);
-
+        
             if (response.ok) {
               const data = await response.json();
               console.log("User speech:", data.user_speech);
               console.log("Bot response:", data.bot_response);
               console.log("Ответ сервера:", data);
               console.log("audio_data:", data.audio_data);
-
+        
               if (data.user_speech) {
                 addMessage(data.user_speech, 'user');
               }
               if (data.bot_response) {
                 addMessage(data.bot_response, 'response');
               }
-
+        
               if (data.audio_data) {
                 try {
                   new URL(data.audio_data);
-
+        
                   const audio = new Audio();
                   audio.type = 'audio/mpeg';
                   audio.src = data.audio_data;
-
+        
+                  isPlayingResponse = true;  // Устанавливаем флаг воспроизведения
+        
                   audio.oncanplaythrough = () => {
                     audio.play().catch(error => {
                       console.error("Error playing audio:", error);
                       document.getElementById('recordingStatus').textContent = "Error playing audio response.";
+                      isPlayingResponse = false;  // Сбрасываем флаг в случае ошибки
                     });
                   };
-
+        
+                  audio.onended = () => {
+                    isPlayingResponse = false;  // Сбрасываем флаг после окончания воспроизведения
+                    console.log("Аудио ответ закончился, можно начинать новую запись");
+                  };
+        
                   audio.onerror = (e) => {
                     console.error("Error loading audio:", e);
                     document.getElementById('recordingStatus').textContent = "Error loading audio response.";
+                    isPlayingResponse = false;  // Сбрасываем флаг в случае ошибки
                   };
                 } catch (urlError) {
                   console.error("Invalid audio data URL:", urlError);
@@ -236,12 +246,13 @@
           } catch (error) {
             console.error('Ошибка отправки запроса:', error);
             document.getElementById('recordingStatus').textContent = "Извините, произошла ошибка при отправке аудио.";
-
+        
             if (error.response) {
               console.error("Ответ сервера с ошибкой:", error.response.status, error.response.statusText);
             }
           }
         }
+        
             
         function addMessage(message, type) {
             const messageElement = document.createElement('p');
@@ -272,7 +283,7 @@
           const NOISE_THRESHOLD = 10; // Уровень шума, ниже которого считается тишиной
         
           function checkSilence() {
-            if (!isCallActive) return; // Прекратить проверку, если звонок завершен
+            if (!isCallActive || isPlayingResponse) return; // Прекратить проверку, если звонок завершен или воспроизводится ответ
         
             analyser.getByteFrequencyData(dataArray);
             const average = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
@@ -289,7 +300,7 @@
               }
             } else {
               silenceStart = null;
-              if (!isRecording) {
+              if (!isRecording && !isPlayingResponse) {
                 console.log("Обнаружен звук, начинаем запись");
                 startRecording();
               }
@@ -299,7 +310,8 @@
           }
         
           checkSilence();
-        }        
+        }
+                
 
         tg.ready();
       }
