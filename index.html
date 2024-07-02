@@ -158,9 +158,6 @@
           if (isRecording) {
             stopRecordingAndSend();
           }
-          if (currentStream) {
-            currentStream.getTracks().forEach(track => track.stop());
-          }
           callButton.textContent = 'Начать звонок';
           addMessage('Звонок завершен', 'system');
           logMessage('Call ended');
@@ -171,10 +168,6 @@
           if (silenceTimer) {
             clearTimeout(silenceTimer);
             silenceTimer = null;
-          }
-          
-          if (silenceDetectionInterval) {
-            clearInterval(silenceDetectionInterval);
           }
         }
 
@@ -205,7 +198,7 @@
           formData.append('audio', audioBlob, 'recording.wav');
         
           try {
-            const response = await fetch('http://127.0.0.1:5000/recognize_speech', {
+            const response = await fetch('/process_audio', {
               method: 'POST',
               body: formData
             });
@@ -234,7 +227,6 @@
                     console.error("Error playing audio:", error);
                     document.getElementById('recordingStatus').textContent = "Error playing audio response.";
                     isPlayingResponse = false;
-                    initializeRecorder(currentStream);
                     resumeListening();
                   });
                 };
@@ -242,7 +234,6 @@
                 audio.onended = () => {
                   isPlayingResponse = false;
                   console.log("Аудио ответ закончился, можно начинать новую запись");
-                  initializeRecorder(currentStream);
                   resumeListening();
                 };
         
@@ -250,20 +241,17 @@
                   console.error("Error loading audio:", e);
                   document.getElementById('recordingStatus').textContent = "Error loading audio response.";
                   isPlayingResponse = false;
-                  initializeRecorder(currentStream);
                   resumeListening();
                 };
               } catch (urlError) {
                 console.error("Invalid audio data URL:", urlError);
                 document.getElementById('recordingStatus').textContent = "Received invalid audio data from server.";
-                initializeRecorder(currentStream);
                 resumeListening();
               }
             }
           } catch (error) {
             console.error('Error sending audio to server:', error);
             document.getElementById('recordingStatus').textContent = "Error: Could not send audio to server.";
-            initializeRecorder(currentStream);
             resumeListening();
           }
         }
