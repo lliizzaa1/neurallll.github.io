@@ -180,7 +180,8 @@
         function initializeRecorder(stream) {
           recorder = new RecordRTC(stream, {
             type: 'audio',
-            mimeType: 'audio/wav'
+            mimeType: 'audio/wav',
+            recorderType: RecordRTC.StereoAudioRecorder 
           });
         }
 
