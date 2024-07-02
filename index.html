@@ -101,6 +101,9 @@
         let isTelegramWebApp = tg.initDataUnsafe.query_id !== undefined;
         let recorder;
         let audioBlob;
+        let isRecording = false;
+        let silenceTimer;
+        const SILENCE_THRESHOLD = 1000; // 1 секунда тишины
 
         console.log('Is Telegram WebApp:', isTelegramWebApp);
         logMessage('App initialized. Is Telegram WebApp: ' + isTelegramWebApp);
@@ -126,7 +129,6 @@
               recorderType: RecordRTC.StereoAudioRecorder
             });
         
-            recorder.startRecording();
             isCallActive = true;
             callButton.textContent = 'Завершить звонок';
             addMessage('Звонок начат. Говорите...', 'system');
@@ -143,15 +145,11 @@
           }
         }
         
-
         function endCall() {
-          if (recorder) {
-            recorder.stopRecording(() => {
-              audioBlob = recorder.getBlob();
-              sendAudioToServer(audioBlob);
-            });
-          }
           isCallActive = false;
+          if (isRecording) {
+            stopRecordingAndSend();
+          }
           callButton.textContent = 'Начать звонок';
           addMessage('Звонок завершен', 'system');
           logMessage('Call ended');
@@ -164,8 +162,21 @@
             silenceTimer = null;
           }
         }
-        
 
+        function startRecording() {
+          isRecording = true;
+          recorder.startRecording();
+          console.log("Запись начата");
+        }
+
+        function stopRecordingAndSend() {
+          isRecording = false;
+          recorder.stopRecording(() => {
+            audioBlob = recorder.getBlob();
+            sendAudioToServer(audioBlob);
+          });
+          console.log("Запись остановлена, отправка на сервер");
+        }
 
         async function sendAudioToServer(audioBlob) {
           console.log("Пытаемся отправить аудио...");
@@ -226,36 +237,27 @@
             console.error('Ошибка отправки запроса:', error);
             document.getElementById('recordingStatus').textContent = "Извините, произошла ошибка при отправке аудио.";
 
-            // Добавьте эти строки:
             if (error.response) {
               console.error("Ответ сервера с ошибкой:", error.response.status, error.response.statusText);
             }
           }
         }
             
-            
-            
-            function addMessage(message, type) {
-                const messageElement = document.createElement('p');
-                messageElement.classList.add(type);
-                messageElement.textContent = message;
-                display.appendChild(messageElement);
-                display.scrollTop = display.scrollHeight;
-            }
-            
-
-            function logMessage(message) {
-                console.log(message);
-                if (isTelegramWebApp) {
-                    tg.sendData(JSON.stringify({action: 'log', message: message}));
-                }
-            }
-
-            tg.ready();
+        function addMessage(message, type) {
+            const messageElement = document.createElement('p');
+            messageElement.classList.add(type);
+            messageElement.textContent = message;
+            display.appendChild(messageElement);
+            display.scrollTop = display.scrollHeight;
         }
-        let silenceTimer;
-        const SILENCE_THRESHOLD = 1000; // 1 секунда тишины
         
+        function logMessage(message) {
+            console.log(message);
+            if (isTelegramWebApp) {
+                tg.sendData(JSON.stringify({action: 'log', message: message}));
+            }
+        }
+
         function startSilenceDetection(stream) {
           const audioContext = new AudioContext();
           const analyser = audioContext.createAnalyser();
@@ -266,12 +268,16 @@
           const dataArray = new Uint8Array(bufferLength);
         
           function checkSilence() {
+            if (!isCallActive) return; // Прекратить проверку, если звонок завершен
+
             analyser.getByteFrequencyData(dataArray);
             const sum = dataArray.reduce((a, b) => a + b, 0);
             if (sum === 0) {
               if (!silenceTimer) {
                 silenceTimer = setTimeout(() => {
-                  endCall();
+                  if (isRecording) {
+                    stopRecordingAndSend();
+                  }
                 }, SILENCE_THRESHOLD);
               }
             } else {
@@ -279,14 +285,20 @@
                 clearTimeout(silenceTimer);
                 silenceTimer = null;
               }
+              if (!isRecording) {
+                startRecording();
+              }
             }
             requestAnimationFrame(checkSilence);
           }
         
           checkSilence();
         }
+
+        tg.ready();
+      }
         
-        initApp();
+      initApp();
     </script>
 </body>
 </html>
