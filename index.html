@@ -133,43 +133,37 @@
         
 
         function startCall() {
-          if (isCallActive) return;
-        
           isCallActive = true;
-          callButton.textContent = 'Завершить звонок';
-          addMessage('Звонок начат', 'system');
-        
-          navigator.mediaDevices.getUserMedia({ audio: true })
-            .then(stream => {
-              currentStream = stream;
-              initializeRecorder(stream);
-              startSilenceDetection(stream);
-            })
-            .catch(error => {
-              console.error('Error accessing the microphone:', error);
-              addMessage('Ошибка: Не удалось получить доступ к микрофону', 'error');
-              endCall();
-            });
-        }
-        
-        
-        function endCall() {
+          document.getElementById('startCall').disabled = true;
+          document.getElementById('endCall').disabled = false;
+          document.getElementById('recordButton').disabled = false;
+          document.getElementById('status').textContent = 'Звонок начат';
+      
+          fetch('http://127.0.0.1:5000/start_call', { method: 'POST' })
+              .then(response => response.json())
+              .then(data => console.log(data.message))
+              .catch(error => console.error('Error:', error));
+      }
+      
+      function endCall() {
           isCallActive = false;
-          if (isRecording) {
-            stopRecordingAndSend();
+          document.getElementById('startCall').disabled = false;
+          document.getElementById('endCall').disabled = true;
+          document.getElementById('recordButton').disabled = true;
+          document.getElementById('status').textContent = 'Звонок завершен';
+      
+          if (mediaRecorder && mediaRecorder.state === 'recording') {
+              mediaRecorder.stop();
           }
-          callButton.textContent = 'Начать звонок';
-          addMessage('Звонок завершен', 'system');
-          logMessage('Call ended');
-          if (isTelegramWebApp) {
-            tg.sendData(JSON.stringify({ action: 'endCall' }));
-          }
-          
-          if (silenceTimer) {
-            clearTimeout(silenceTimer);
-            silenceTimer = null;
-          }
-        }
+      
+          fetch('http://127.0.0.1:5000/end_call', { method: 'POST' })
+              .then(response => response.json())
+              .then(data => {
+                  console.log(data.message);
+                  console.log('Conversation history:', data.conversation_history);
+              })
+              .catch(error => console.error('Error:', error));
+      }      
 
         function startRecording() {
           isRecording = true;
