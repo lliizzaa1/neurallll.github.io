@@ -207,7 +207,8 @@
             console.log("Отправка аудио на сервер...");
             const response = await fetch('http://127.0.0.1:5000/recognize_speech', { 
               method: 'POST',
-              body: formData
+              body: formData,
+              credentials: 'include'
             });
         
             console.log("Получен ответ от сервера. Статус:", response.status);
