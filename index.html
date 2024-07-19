@@ -144,7 +144,10 @@
                         currentStream = stream;
                         initializeRecorder(stream);
                         startSilenceDetection(stream);
-
+                        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                          console.log('ID пользователя Telegram (startCall):', tg.initDataUnsafe.user.id);
+                        } else {
+                          console.error("Ошибка: tg.initDataUnsafe.user is undefined");}
                         // Получаем ID пользователя после того, как разрешили доступ к микрофону
                         console.log('ID пользователя Telegram (startCall):', tg.initDataUnsafe.user.id); 
                     })
