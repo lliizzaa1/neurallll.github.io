@@ -150,7 +150,41 @@
               addMessage('Ошибка: Не удалось получить доступ к микрофону', 'error');
               endCall();
             });
+        }function startCall() {
+          if (isCallActive) return;
+      
+          fetch('http://127.0.0.1:5000/start_call', { 
+              method: 'POST',
+              credentials: 'include'
+          })
+          .then(response => {
+              if (response.ok) {
+                  isCallActive = true;
+                  callButton.textContent = 'Завершить звонок';
+                  addMessage('Звонок начат', 'system');
+      
+                  navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(stream => {
+                      currentStream = stream;
+                      initializeRecorder(stream);
+                      startSilenceDetection(stream); 
+                    })
+                    .catch(error => {
+                      console.error('Error accessing the microphone:', error);
+                      addMessage('Ошибка: Не удалось получить доступ к микрофону', 'error');
+                      endCall();
+                    });
+              } else {
+                  console.error('Ошибка при старте звонка:', response.status);
+                  addMessage('Ошибка: Не удалось начать звонок', 'error');
+              }
+          })
+          .catch(error => {
+              console.error('Ошибка при отправке запроса /start_call:', error);
+              addMessage('Ошибка: Не удалось начать звонок', 'error');
+          });
         }
+      
         
         function endCall() {
           isCallActive = false;
