@@ -105,33 +105,30 @@
             let isPlayingResponse = false;
             let silenceDetectionInterval;
             let currentStream; 
+            let userId; //  <-- Переменная для хранения ID пользователя
 
             const SILENCE_THRESHOLD = 1000; // 1 секунда тишины
 
             // Инициализация Telegram Mini App
             tg.ready();
-            
+
             // Обработчик нажатия на кнопку "Начать звонок"
             callButton.addEventListener('click', toggleCall);
 
-            // Получаем ID пользователя после инициализации Mini App
+            // Получаем ID пользователя после нажатия на главную кнопку
             tg.onEvent('mainButtonClicked', () => {
-                console.log('ID пользователя Telegram (mainButtonClicked):', tg.initDataUnsafe.user.id); 
+                console.log('ID пользователя Telegram (mainButtonClicked):', tg.initDataUnsafe.user.id);
+                userId = tg.initDataUnsafe.user.id; // Сохраняем ID пользователя
+
+                // --- ЗДЕСЬ МОЖНО ИСПОЛЬЗОВАТЬ userId --- 
+                // Например, отправить его на сервер:
+                sendUserIdToServer(userId); 
             });
 
             // Логируем сообщение после инициализации
             logMessage('App initialized. Is Telegram WebApp: ' + (tg.initDataUnsafe.query_id !== undefined));
 
             // --- ФУНКЦИИ ---
-
-            function getUserId() {
-              if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-                  return tg.initDataUnsafe.user.id;
-              } else {
-                  console.error("User ID is not available");
-                  return null;
-              }
-          }
 
             function toggleCall() {
                 if (isCallActive) {
@@ -153,8 +150,9 @@
                         currentStream = stream;
                         initializeRecorder(stream);
                         startSilenceDetection(stream);
-                        console.log('ID пользователя Telegram (startCall):', getUserId());
-                        console.log('тест:', tg.initDataUnsafe);
+
+                        // НЕ ПОЛУЧАЕМ ID ЗДЕСЬ, используем сохраненный userId
+                        // ... ваш код ... 
                     })
                     .catch(error => {
                         console.error('Error accessing the microphone:', error);
@@ -171,7 +169,7 @@
                 callButton.textContent = 'Начать звонок';
                 addMessage('Звонок завершен', 'system');
                 logMessage('Call ended');
-                if (tg.initDataUnsafe.query_id !== undefined) { // Проверка, запущена ли Mini App
+                if (tg.initDataUnsafe.query_id !== undefined) {
                     tg.sendData(JSON.stringify({ action: 'endCall' }));
                 }
 
@@ -180,7 +178,6 @@
                     silenceTimer = null;
                 }
 
-                // Остановка детектора тишины
                 if (silenceDetectionInterval) {
                     clearInterval(silenceDetectionInterval);
                     silenceDetectionInterval = null;
@@ -200,7 +197,7 @@
                 recorder.startRecording();
                 console.log("Запись начата");
             }
-        
+
             function initializeRecorder(stream) {
                 recorder = new RecordRTC(stream, {
                     type: 'audio',
@@ -222,13 +219,18 @@
                 const formData = new FormData();
                 formData.append('audio', audioBlob, 'recording.wav');
 
-                // Получение ID пользователя Telegram (убедитесь, что Mini App инициализирована)
-                let telegramUserId = tg.initDataUnsafe ? tg.initDataUnsafe.user.id : null;
-                formData.append('telegram_user_id', telegramUserId); 
+                // Использование сохраненного userId (проверка на undefined)
+                if (userId) {
+                    formData.append('telegram_user_id', userId);
+                } else {
+                    console.error("Ошибка: userId не определен");
+                    // Дополнительная обработка ошибки, 
+                    // например, показ сообщения пользователю
+                }
 
                 try {
                     console.log("Отправка аудио на сервер...");
-                    const response = await fetch('http://127.0.0.1:5000/recognize_speech', { 
+                    const response = await fetch('http://127.0.0.1:5000/recognize_speech', {
                         method: 'POST',
                         body: formData,
                         credentials: 'include'
@@ -255,45 +257,45 @@
                             audio.type = 'audio/mpeg';
                             audio.src = data.audio_data;
 
-                            isPlayingResponse = true; 
+                            isPlayingResponse = true;
 
                             audio.oncanplaythrough = () => {
-                            console.log("Аудио готово к воспроизведению");
-                            audio.play().catch(error => {
-                                console.error("Ошибка воспроизведения аудио:", error);
-                                document.getElementById('recordingStatus').textContent = "Ошибка воспроизведения аудио ответа.";
-                                isPlayingResponse = false; 
-                                resumeListening(); 
-                            });
+                                console.log("Аудио готово к воспроизведению");
+                                audio.play().catch(error => {
+                                    console.error("Ошибка воспроизведения аудио:", error);
+                                    document.getElementById('recordingStatus').textContent = "Ошибка воспроизведения аудио ответа.";
+                                    isPlayingResponse = false;
+                                    resumeListening();
+                                });
                             };
 
                             audio.onended = () => {
-                            console.log("Воспроизведение аудио ответа завершено");
-                            isPlayingResponse = false; 
-                            resumeListening(); 
+                                console.log("Воспроизведение аудио ответа завершено");
+                                isPlayingResponse = false;
+                                resumeListening();
                             };
 
                             audio.onerror = (e) => {
-                            console.error("Ошибка загрузки аудио:", e);
-                            document.getElementById('recordingStatus').textContent = "Ошибка загрузки аудио ответа.";
-                            isPlayingResponse = false; 
-                            resumeListening(); 
+                                console.error("Ошибка загрузки аудио:", e);
+                                document.getElementById('recordingStatus').textContent = "Ошибка загрузки аудио ответа.";
+                                isPlayingResponse = false;
+                                resumeListening();
                             };
                         } catch (urlError) {
                             console.error("Некорректный URL аудио данных:", urlError);
                             document.getElementById('recordingStatus').textContent = "Получены некорректные аудио данные от сервера.";
-                            resumeListening(); 
+                            resumeListening();
                         }
                     } else {
                         console.log("Аудио данные отсутствуют в ответе сервера");
-                        resumeListening(); 
+                        resumeListening();
                     }
                 } catch (error) {
                     console.error('Ошибка отправки аудио на сервер:', error);
                     document.getElementById('recordingStatus').textContent = `Ошибка: ${error.message}`;
-                    resumeListening(); 
+                    resumeListening();
                 }
-            }        
+            }
 
             function addMessage(message, type) {
                 const messageElement = document.createElement('p');
@@ -305,7 +307,7 @@
             
             function logMessage(message) {
                 console.log(message);
-                if (tg.initDataUnsafe.query_id !== undefined) { // Проверка, запущена ли Mini App
+                if (tg.initDataUnsafe.query_id !== undefined) {
                     tg.sendData(JSON.stringify({action: 'log', message: message}));
                 }
             }
@@ -318,48 +320,58 @@
                 analyser.fftSize = 2048;
                 const bufferLength = analyser.frequencyBinCount;
                 const dataArray = new Uint8Array(bufferLength);
-            
+
                 let silenceStart = null;
                 const SILENCE_DURATION = 1000; // 1 секунда тишины
                 const NOISE_THRESHOLD = 10; // Уровень шума, ниже которого считается тишиной
-            
+
                 function checkSilence() {
-                // Проверка, активен ли звонок
-                if (!isCallActive) {
-                    console.log("Звонок завершен, останавливаем проверку тишины");
-                    clearInterval(silenceDetectionInterval);
-                    return;
-                }
-            
-                if (isPlayingResponse) {
-                    console.log("Воспроизводится ответ, ожидаем...");
-                    return;
-                }
-            
-                analyser.getByteFrequencyData(dataArray);
-                const average = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
-            
-                if (average < NOISE_THRESHOLD) {
-                    if (!silenceStart) {
-                    silenceStart = Date.now();
-                    } else if (Date.now() - silenceStart > SILENCE_DURATION && !isPlayingResponse) { 
-                    if (isRecording) {
-                        console.log("Обнаружена тишина, останавливаем запись");
-                        stopRecordingAndSend();
-                        silenceStart = null; 
+                    if (!isCallActive) {
+                        console.log("Звонок завершен, останавливаем проверку тишины");
+                        clearInterval(silenceDetectionInterval);
+                        return;
                     }
+
+                    if (isPlayingResponse) {
+                        console.log("Воспроизводится ответ, ожидаем...");
+                        return;
                     }
-                } else {
-                    silenceStart = null; 
-                    if (!isRecording && !isPlayingResponse) { 
-                    console.log("Обнаружен звук, начинаем запись");
-                    startRecording();
+
+                    analyser.getByteFrequencyData(dataArray);
+                    const average = dataArray.reduce((sum, value) => sum + value, 0) / bufferLength;
+
+                    if (average < NOISE_THRESHOLD) {
+                        if (!silenceStart) {
+                            silenceStart = Date.now();
+                        } else if (Date.now() - silenceStart > SILENCE_DURATION && !isPlayingResponse) {
+                            if (isRecording) {
+                                console.log("Обнаружена тишина, останавливаем запись");
+                                stopRecordingAndSend();
+                                silenceStart = null;
+                            }
+                        }
+                    } else {
+                        silenceStart = null;
+                        if (!isRecording && !isPlayingResponse) {
+                            console.log("Обнаружен звук, начинаем запись");
+                            startRecording();
+                        }
                     }
                 }
-                }
-            
-                silenceDetectionInterval = setInterval(checkSilence, 100); 
+
+                silenceDetectionInterval = setInterval(checkSilence, 100);
             }
+
+            // Пример функции для отправки userId на сервер
+            function sendUserIdToServer(userId) {
+                if (userId) { 
+                    // Добавьте ваш код для отправки userId на сервер
+                    console.log("Отправляем userId на сервер:", userId); 
+                } else {
+                    console.error("Ошибка: userId не определен, отправка отменена");
+                }
+            }
+
         });
     </script>
 </body>
