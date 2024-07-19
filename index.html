@@ -110,6 +110,7 @@
         const SILENCE_THRESHOLD = 1000; // 1 секунда тишины
 
         console.log('Is Telegram WebApp:', isTelegramWebApp);
+        window.Telegram.WebApp.ready();
         logMessage('App initialized. Is Telegram WebApp: ' + isTelegramWebApp);
 
         tg.expand();
@@ -377,7 +378,6 @@
         tg.ready();
       }
         
-      initApp();
       document.addEventListener('DOMContentLoaded', initApp);
     </script>
 </body>
