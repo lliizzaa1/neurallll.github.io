@@ -236,6 +236,7 @@
         async function sendAudioToServer(audioBlob) {
           const formData = new FormData();
           formData.append('audio', audioBlob, 'recording.wav');
+          await window.Telegram.WebApp.ready();
           formData.append('telegram_user_id', window.Telegram.WebApp.initDataUnsafe.user.id); 
         
           try {
@@ -377,6 +378,7 @@
       }
         
       initApp();
+      document.addEventListener('DOMContentLoaded', initApp);
     </script>
 </body>
 </html>
