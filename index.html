@@ -236,6 +236,7 @@
         async function sendAudioToServer(audioBlob) {
           const formData = new FormData();
           formData.append('audio', audioBlob, 'recording.wav');
+          formData.append('telegram_user_id', window.Telegram.WebApp.initDataUnsafe.user.id); 
         
           try {
             console.log("Отправка аудио на сервер...");
