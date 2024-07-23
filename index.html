@@ -105,16 +105,14 @@
             let isPlayingResponse = false;
             let silenceDetectionInterval;
             let currentStream; 
-            let userId; // Переменная для хранения ID пользователя
+            const urlParams = new URLSearchParams(window.location.search);
+            const userId = urlParams.get('user_id');
+            console.log('ID пользователя из URL:', userId);
 
             const SILENCE_THRESHOLD = 1000; // 1 секунда тишины
 
             // Инициализация Telegram Mini App
             tg.ready();
-
-            // Получаем ID пользователя из initData
-            userId = tg.initData.user ? tg.initData.user.id : null; 
-            console.log('ID пользователя Telegram (initData):', userId);
 
             // Обработчик нажатия на кнопку "Начать звонок"
             callButton.addEventListener('click', toggleCall);
