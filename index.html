@@ -176,6 +176,7 @@
                     clearInterval(silenceDetectionInterval);
                     silenceDetectionInterval = null;
                 }
+                deleteConversation();
             }
 
             function resumeListening() {
@@ -302,6 +303,26 @@
                 console.log(message);
                 if (tg.initData.query_id !== undefined) { // Проверка, запущена ли Mini App
                     tg.sendData(JSON.stringify({action: 'log', message: message}));
+                }
+            }
+            
+            async function deleteConversation() {
+                const formData = new FormData();
+                formData.append('telegram_user_id', userId); //  userId  -  из Telegram Web App
+            
+                try {
+                    const response = await fetch('http://127.0.0.1:5000/delete_conversation', {
+                        method: 'POST',
+                        body: formData
+                    });
+            
+                    if (response.ok) {
+                        console.log('Conversation deleted successfully');
+                    } else {
+                        console.error('Error deleting conversation:', response.status);
+                    }
+                } catch (error) {
+                    console.error('Error deleting conversation:', error);
                 }
             }
 
