@@ -107,6 +107,7 @@
             let currentStream; 
             const urlParams = new URLSearchParams(window.location.search);
             const userId = urlParams.get('user_id');
+            console.log('URL:', urlParams);
             console.log('ID пользователя из URL:', userId);
 
             const SILENCE_THRESHOLD = 1000; // 1 секунда тишины
