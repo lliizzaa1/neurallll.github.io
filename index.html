@@ -134,14 +134,14 @@
                 }
             }
 
-            function startCall() {
+            async function startCall() {
                 if (isCallActive) return;
 
                 isCallActive = true;
                 callButton.textContent = 'Завершить звонок';
                 addMessage('Звонок начат', 'system');
 
-                const personCharacteristics = generatePersonCharacteristics();
+                const personCharacteristics = await generatePersonCharacteristics();
                 console.log("Сгенерированные характеристики:", personCharacteristics); 
 
                 navigator.mediaDevices.getUserMedia({ audio: true })
