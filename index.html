@@ -121,7 +121,7 @@
         <div class="call-duration">00:00</div>
       </div>
       <div class="call-button"> 
-        <img src="https://drive.google.com/file/d/1KZYtM8DktTPRq5MDMT19DhWqq-5B0BIN/view?usp=sharing" alt="Начать звонок"> 
+        <img src="call_start.png" alt="Начать звонок">  
       </div>
     </div>
 
@@ -173,7 +173,7 @@
 
         async function startCall() {
           callButton.style.backgroundColor = 'red'; 
-          callButtonImg.src = 'https://drive.google.com/file/d/1KZYtM8DktTPRq5MDMT19DhWqq-5B0BIN/view?usp=sharing'; 
+          callButtonImg.src = 'call_end.png'; 
           addMessage('Звонок начат', 'system');
           personCharacteristics = await generatePersonCharacteristics();
           console.log("Сгенерированные характеристики:", personCharacteristics); 
@@ -193,7 +193,7 @@
 
         function endCall() {
           callButton.style.backgroundColor = 'green';
-          callButtonImg.src = 'https://drive.google.com/file/d/1Oj4Id1e53ow969T5RVd1wiaGjUx7pdCu/view?usp=sharing';
+          callButtonImg.src = 'call_start.png';
           addMessage('Звонок завершен', 'system');
           logMessage('Call ended');
           if (tg.initData.query_id !== undefined) {
