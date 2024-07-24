@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Симулятор холодных звонков</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/RecordRTC/5.6.2/RecordRTC.min.js"></script>
@@ -24,9 +24,10 @@
       background: linear-gradient(to bottom, #B0C4DE, #778899);
     }
 
+    /* Увеличиваем размер телефона */
     .phone {
-      width: 375px;
-      height: 812px;
+      width: 400px; 
+      height: 900px; 
       border-radius: 40px;
       overflow: hidden;
       box-shadow: 0px 0px 20px rgba(0, 0, 0, 0.2);
@@ -71,7 +72,7 @@
     .caller-info {
       text-align: center;
       color: black;
-      margin-top: 30px; /* Уменьшенный margin */
+      margin-top: 30px; 
       font-family: 'SF Mono', sans-serif; 
     }
 
@@ -183,6 +184,9 @@
         const callButtonImg = callButton.querySelector('img');
         let startTime;
         let callTimer;
+
+        // Развернуть iframe на всю высоту
+        tg.expand();
 
         callButton.addEventListener('click', toggleCall);
 
@@ -494,15 +498,10 @@
             ])
           };
 
-          let imageName;
-          if (characteristics["пол"] === "Мужской") {
-            imageName = 'man.png'; 
-          } else {
-            imageName = 'woman.png'; 
-          } 
+          const gender = getRandomElement(["man", "woman"]); // Выбор картинки
+          characteristics.gender = gender; 
 
-          callerImage.innerHTML = `<img src="${imageName}" alt="${characteristics["пол"]}">`; 
-
+          callerImage.innerHTML = `<img src="${gender}.png" alt="${gender}">`; // Добавление картинки в HTML
 
           return characteristics;
         }
