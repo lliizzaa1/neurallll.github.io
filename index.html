@@ -7,13 +7,7 @@
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/RecordRTC/5.6.2/RecordRTC.min.js"></script>
   <style>
-    @font-face {
-      font-family: 'SF Mono'; 
-      src: local('SF Mono'), 
-           url('SF-Mono.woff2') format('woff2'), /* УКАЖИТЕ ПРАВИЛЬНЫЙ ПУТЬ */
-           url('SF-Mono.woff') format('woff'),     /* УКАЖИТЕ ПРАВИЛЬНЫЙ ПУТЬ */
-           url('SF-Mono.ttf') format('truetype');    /* УКАЖИТЕ ПРАВИЛЬНЫЙ ПУТЬ */
-    }
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap');
 
     body {
       margin: 0;
@@ -22,9 +16,9 @@
       align-items: center;
       min-height: 100vh;
       background: linear-gradient(to bottom, #B0C4DE, #778899);
+      font-family: 'Montserrat', sans-serif; 
     }
 
-    /* Увеличиваем размер телефона */
     .phone {
       width: 400px; 
       height: 900px; 
@@ -62,7 +56,6 @@
       padding: 10px 20px;
       color: black;
       font-size: 14px;
-      font-family: 'SF Mono', sans-serif; 
     }
 
     .time {
@@ -73,13 +66,17 @@
       text-align: center;
       color: black;
       margin-top: 30px; 
-      font-family: 'SF Mono', sans-serif; 
+    }
+
+    .caller-name {
+      font-size: 24px;
+      font-weight: bold;
     }
 
     .caller-image {
       width: 80px;
       height: 80px;
-      margin: 0 auto 10px auto; 
+      margin: 20px auto 10px auto; 
       border-radius: 50%;
       overflow: hidden;
     }
@@ -90,13 +87,9 @@
       object-fit: cover;
     }
 
-    .caller-name {
-      font-size: 24px;
-      font-weight: bold;
-    }
-
     .call-duration {
       font-size: 18px;
+      margin-bottom: 10px; 
     }
 
     .call-button { 
@@ -120,13 +113,27 @@
       height: 40px;
     }
     
-    .microphone-recording {
-      animation: pulse 1s infinite; 
+    .sound-wave-container {
+      position: absolute;
+      width: 200px; 
+      height: 30px; 
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 120px; 
+      overflow: hidden;
     }
 
-    @keyframes pulse {
-      0%, 100% { transform: scale(1); }
-      50% { transform: scale(1.1); opacity: 0.7; } 
+    .sound-wave {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+      background-size: 400% 100%; 
+      animation: waveAnimation 2s linear infinite; 
+    }
+
+    @keyframes waveAnimation {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 100% 50%; } 
     }
 
     .microphone-muted {
@@ -147,9 +154,13 @@
       </div>
 
       <div class="caller-info">
-        <div class="caller-image"></div> 
-        <div class="caller-name">Клиент</div>
         <div class="call-duration">00:00</div>
+        <div class="caller-name">Клиент</div>
+        <div class="caller-image"></div> 
+      </div>
+
+      <div class="sound-wave-container">
+        <div class="sound-wave"></div>
       </div>
 
       <div class="call-button"> 
@@ -182,10 +193,10 @@
         const callDuration = document.querySelector('.call-duration');
         const callerImage = document.querySelector('.caller-image');
         const callButtonImg = callButton.querySelector('img');
+        const soundWave = document.querySelector('.sound-wave');
         let startTime;
         let callTimer;
 
-        // Развернуть iframe на всю высоту
         tg.expand();
 
         callButton.addEventListener('click', toggleCall);
@@ -262,8 +273,7 @@
         function startRecording() {
           isRecording = true;
           recorder.startRecording();
-          callButtonImg.classList.add('microphone-recording');
-          callButtonImg.classList.remove('microphone-muted');
+          soundWave.style.animationPlayState = 'running';
           console.log("Запись начата");
         }
 
@@ -291,8 +301,7 @@
           }
 
           isProcessingRequest = true; 
-          callButtonImg.classList.remove('microphone-recording');
-          callButtonImg.classList.add('microphone-muted');
+          soundWave.style.animationPlayState = 'paused'; 
 
           const formData = new FormData();
           formData.append('audio', audioBlob, 'recording.wav');
@@ -339,7 +348,6 @@
             if (data.audio_data) {
               try {
                 console.log("Попытка воспроизведения аудио ответа...");
-                new URL(data.audio_data); 
 
                 const audio = new Audio();
                 audio.src = data.audio_data;
@@ -383,7 +391,7 @@
         }        
 
         function addMessage(message, type) {
-
+          
         }
         
         function logMessage(message) {
@@ -498,10 +506,10 @@
             ])
           };
 
-          const gender = getRandomElement(["man", "woman"]); // Выбор картинки
+          const gender = getRandomElement(["man", "woman"]); 
           characteristics.gender = gender; 
 
-          callerImage.innerHTML = `<img src="${gender}.png" alt="${gender}">`; // Добавление картинки в HTML
+          callerImage.innerHTML = `<img src="${gender}.png" alt="${gender}">`;
 
           return characteristics;
         }
@@ -546,8 +554,7 @@
               return;
             }
 
-            if (isPlayingResponse) {
-              console.log("Воспроизводится ответ, ожидаем...");
+            if (isPlayingResponse) { 
               return;
             }
 
