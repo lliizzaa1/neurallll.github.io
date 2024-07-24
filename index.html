@@ -384,6 +384,7 @@
 
                 audio.oncanplaythrough = () => {
                   console.log("Аудио готово к воспроизведению");
+                  audio.playbackRate = 2;
                   audio.play().catch(error => {
                     console.error("Ошибка воспроизведения аудио:", error);
                     isPlayingResponse = false; 
