@@ -71,8 +71,22 @@
     .caller-info {
       text-align: center;
       color: black;
-      margin-top: 50px;
+      margin-top: 30px; /* Уменьшенный margin */
       font-family: 'SF Mono', sans-serif; 
+    }
+
+    .caller-image {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 10px auto; 
+      border-radius: 50%;
+      overflow: hidden;
+    }
+
+    .caller-image img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
 
     .caller-name {
@@ -104,6 +118,20 @@
       width: 40px;
       height: 40px;
     }
+    
+    .microphone-recording {
+      animation: pulse 1s infinite; 
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); opacity: 0.7; } 
+    }
+
+    .microphone-muted {
+      opacity: 0.5;
+    }
+
   </style>
 </head>
 <body>
@@ -118,12 +146,13 @@
       </div>
 
       <div class="caller-info">
+        <div class="caller-image"></div> 
         <div class="caller-name">Клиент</div>
         <div class="call-duration">00:00</div>
       </div>
 
       <div class="call-button"> 
-        <img src="call_start.png" alt="Начать звонок">  
+        <img src="call_start.png" alt="Начать звонок" class="microphone-muted">  
       </div>
     </div>
 
@@ -141,7 +170,7 @@
         const urlParams = new URLSearchParams(window.location.search);
         const userId = urlParams.get('user_id');
 
-        const SILENCE_THRESHOLD = 1000; // 1 секунда тишины
+        const SILENCE_THRESHOLD = 1000; 
         let isProcessingRequest = false;
         let audioRequests = [];
         let personCharacteristics; 
@@ -150,6 +179,7 @@
 
         const callButton = document.querySelector('.call-button');
         const callDuration = document.querySelector('.call-duration');
+        const callerImage = document.querySelector('.caller-image');
         const callButtonImg = callButton.querySelector('img');
         let startTime;
         let callTimer;
@@ -160,12 +190,10 @@
 
         function toggleCall() {
           if (!isCallActive) {
-            // Начало звонка
             startCall();
             startTime = new Date();
             callTimer = setInterval(updateCallDuration, 1000);
           } else {
-            // Завершение звонка
             endCall();
             clearInterval(callTimer);
             callDuration.textContent = '00:00';
@@ -230,6 +258,8 @@
         function startRecording() {
           isRecording = true;
           recorder.startRecording();
+          callButtonImg.classList.add('microphone-recording');
+          callButtonImg.classList.remove('microphone-muted');
           console.log("Запись начата");
         }
 
@@ -257,6 +287,9 @@
           }
 
           isProcessingRequest = true; 
+          callButtonImg.classList.remove('microphone-recording');
+          callButtonImg.classList.add('microphone-muted');
+
           const formData = new FormData();
           formData.append('audio', audioBlob, 'recording.wav');
 
@@ -276,7 +309,6 @@
 
           try {
             console.log("Отправка аудио на сервер...");
-            // const response = await fetch('https://lliizzaa1.github.io/recognize_speech', {
             const response = await fetch('http://127.0.0.1:5000/recognize_speech', { 
               method: 'POST',
               body: formData
@@ -347,11 +379,7 @@
         }        
 
         function addMessage(message, type) {
-          // const messageElement = document.createElement('p');
-          // messageElement.classList.add(type);
-          // messageElement.textContent = message;
-          // display.appendChild(messageElement);
-          // display.scrollTop = display.scrollHeight;
+
         }
         
         function logMessage(message) {
@@ -465,7 +493,13 @@
               "Стрессоустойчивость", "Перфекционизм"
             ])
           };
-          return characteristics; 
+
+          const gender = getRandomElement(["man", "woman"]); // Выбор картинки
+          characteristics.gender = gender; 
+
+          callerImage.innerHTML = `<img src="${gender}.png" alt="${gender}">`; // Добавление картинки в HTML
+
+          return characteristics;
         }
 
         async function deleteConversation() {
@@ -546,7 +580,6 @@
           callDuration.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
         }
         
-        // Обновление времени
         function updateTime() {
           const now = new Date();
           const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
