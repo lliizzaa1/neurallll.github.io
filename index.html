@@ -204,21 +204,21 @@
                 });
             }
 
-            function stopRecordingAndSend() {
+            function stopRecordingAndSend(personCharacteristics) {
                 isRecording = false;
                 recorder.stopRecording(() => {
                     audioBlob = recorder.getBlob();
-                    sendAudioToServer(audioBlob);
+                    sendAudioToServer(audioBlob, personCharacteristics);
                 });
                 console.log("Запись остановлена, отправка на сервер");
             }
 
-            async function sendAudioToServer(audioBlob) {
+            async function sendAudioToServer(audioBlob, personCharacteristics) {
                 if (isProcessingRequest) { 
                     console.log("Предыдущий запрос еще обрабатывается.");
                     return; 
                 }
-
+                console.log(personCharacteristics)
                 isProcessingRequest = true; 
                 const formData = new FormData();
                 formData.append('audio', audioBlob, 'recording.wav');
@@ -478,7 +478,7 @@
                         } else if (Date.now() - silenceStart > SILENCE_DURATION && !isPlayingResponse) { 
                             if (isRecording) {
                                 console.log("Обнаружена тишина, останавливаем запись");
-                                stopRecordingAndSend();
+                                stopRecordingAndSend(personCharacteristics);
                                 silenceStart = null; 
                             }
                         }
