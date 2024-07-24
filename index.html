@@ -142,14 +142,14 @@
                 callButton.textContent = 'Завершить звонок';
                 addMessage('Звонок начат', 'system');
 
-                const personCharacteristics = await generatePersonCharacteristics();
+                personCharacteristics = await generatePersonCharacteristics();
                 console.log("Сгенерированные характеристики:", personCharacteristics); 
 
                 navigator.mediaDevices.getUserMedia({ audio: true })
                     .then(stream => {
                         currentStream = stream;
                         initializeRecorder(stream);
-                        startSilenceDetection(stream);
+                        startSilenceDetection(stream, personCharacteristics);
                     })
                     .catch(error => {
                         console.error('Error accessing the microphone:', error);
@@ -187,7 +187,7 @@
                 if (isCallActive && !isRecording && !isPlayingResponse) { 
                     console.log("Возобновляем прослушивание");
                     initializeRecorder(currentStream);
-                    startSilenceDetection(currentStream);
+                    startSilenceDetection(currentStream, personCharacteristics);
                 }
             }
 
@@ -445,7 +445,7 @@
                 }
             }
 
-            function startSilenceDetection(stream) {
+            function startSilenceDetection(stream, personCharacteristics) {
                 const audioContext = new AudioContext();
                 const analyser = audioContext.createAnalyser();
                 const microphone = audioContext.createMediaStreamSource(stream);
