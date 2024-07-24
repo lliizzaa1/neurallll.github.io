@@ -123,22 +123,45 @@
       overflow: hidden;
     }
 
-    .sound-wave {
+    .sound-wave { 
+      display: flex;
+      align-items: center;
       width: 100%;
       height: 100%;
-      background: linear-gradient(to right, #8A2BE2, #9370DB, #9932CC, #BA55D3, #DDA0DD);
-      background-size: 400% 100%; 
-      animation: waveAnimation 2s linear infinite;
-      animation-play-state: paused; 
     }
 
-    @keyframes waveAnimation {
-      0% { background-position: 0% 50%; }
-      100% { background-position: 100% 50%; } 
+    .circle {
+      position: absolute;
+      width: 10px; 
+      height: 10px; 
+      border-radius: 100%;
+      background-color: #8A2BE2; 
+      animation: move-the-circle 1s infinite;
+      transform-origin: center center;
     }
 
-    .microphone-muted {
-      opacity: 0.5;
+    @for $num from 1 through 8 {
+      .circle:nth-child(#{$num}) {
+        left: ($num - 1) * 20px; 
+        animation-delay: $num * .1s;
+      }
+    }
+
+    @keyframes move-the-circle {
+      0% {
+        transform: translate(0, 0);
+      }
+      50% {
+        transform: translate(0, 10px); 
+      }
+      100% {
+        transform: translate(0, 0);
+      }
+    }
+
+    .microphone-muted .circle {
+      background-color: #D3D3D3; 
+      animation-play-state: paused;
     }
   </style>
 </head>
@@ -160,7 +183,16 @@
       </div>
 
       <div class="sound-wave-container">
-        <div class="sound-wave"></div>
+        <div class="sound-wave microphone-muted"> 
+          <div class="circle"></div>
+          <div class="circle"></div>
+          <div class="circle"></div>
+          <div class="circle"></div>
+          <div class="circle"></div>
+          <div class="circle"></div>
+          <div class="circle"></div>
+          <div class="circle"></div>
+        </div>
       </div>
 
       <div class="call-button"> 
@@ -193,7 +225,7 @@
         const callDuration = document.querySelector('.call-duration');
         const callerImage = document.querySelector('.caller-image');
         const callButtonImg = callButton.querySelector('img');
-        const soundWave = document.querySelector('.sound-wave');
+        const soundWave = document.querySelector('.sound-wave'); 
         let startTime;
         let callTimer;
 
@@ -273,7 +305,7 @@
         function startRecording() {
           isRecording = true;
           recorder.startRecording();
-          soundWave.style.animationPlayState = 'running';
+          soundWave.classList.remove('microphone-muted'); 
           console.log("Запись начата");
         }
 
@@ -301,7 +333,7 @@
           }
 
           isProcessingRequest = true; 
-          soundWave.style.animationPlayState = 'paused'; 
+          soundWave.classList.add('microphone-muted');
 
           const formData = new FormData();
           formData.append('audio', audioBlob, 'recording.wav');
