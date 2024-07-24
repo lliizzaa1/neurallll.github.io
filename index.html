@@ -115,46 +115,42 @@
     
     .sound-wave-container {
       position: absolute;
-      width: 240px;
-      height: 100px;
+      width: 240px; 
+      height: 100px; 
       left: 50%;
       transform: translateX(-50%);
       bottom: 120px; 
-      overflow: hidden;
+      overflow: hidden; 
+      display: flex;
+      align-items: center; 
     }
 
-    .sound-wave { 
-      display: flex;
-      align-items: center; /* Центрируем по вертикали */
+    .sound-wave {
       width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between; 
     }
 
     .circle {
-      position: absolute;
-      width: 5px; 
-      height: 5px; 
-      border-radius: 100%;
-      background-color: #4682B4; 
-      animation: move-the-circle 1s infinite;
-      transform-origin: center center;
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background-color: #8A2BE2;
+      animation: wave 1.5s infinite ease-in-out; 
     }
 
-    @for $num from 1 through 8 {
-      .circle:nth-child(#{$num}) {
-        left: ($num - 1) * 10px; 
-        animation-delay: $num * .1s;
-      }
+    .circle:nth-child(even) {
+      animation-delay: .5s; 
     }
 
-    @keyframes move-the-circle {
-      0% {
-        transform: translateY(0);
+    @keyframes wave {
+      0%, 100% {
+        transform: translateY(0); 
       }
       50% {
-        transform: translateY(100px); /* Сдвигаем вниз на 10px */
-      }
-      100% {
-        transform: translateY(0); 
+        transform: translateY(-20px); 
       }
     }
 
@@ -162,6 +158,7 @@
       background-color: #D3D3D3; 
       animation-play-state: paused;
     }
+    
   </style>
 </head>
 <body>
