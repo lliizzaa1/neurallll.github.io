@@ -115,8 +115,8 @@
     
     .sound-wave-container {
       position: absolute;
-      width: 200px; 
-      height: 30px; 
+      width: 200px;
+      height: 30px;
       left: 50%;
       transform: translateX(-50%);
       bottom: 120px; 
@@ -126,9 +126,10 @@
     .sound-wave {
       width: 100%;
       height: 100%;
-      background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+      background: linear-gradient(to right, #8A2BE2, #9370DB, #9932CC, #BA55D3, #DDA0DD);
       background-size: 400% 100%; 
-      animation: waveAnimation 2s linear infinite; 
+      animation: waveAnimation 2s linear infinite;
+      animation-play-state: paused; 
     }
 
     @keyframes waveAnimation {
@@ -139,7 +140,6 @@
     .microphone-muted {
       opacity: 0.5;
     }
-
   </style>
 </head>
 <body>
@@ -154,8 +154,8 @@
       </div>
 
       <div class="caller-info">
-        <div class="call-duration">00:00</div>
         <div class="caller-name">Клиент</div>
+        <div class="call-duration">00:00</div> 
         <div class="caller-image"></div> 
       </div>
 
