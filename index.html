@@ -105,7 +105,6 @@
             let isPlayingResponse = false;
             let silenceDetectionInterval;
             let currentStream; 
-            let personCharacteristics;
             const urlParams = new URLSearchParams(window.location.search);
             const userId = urlParams.get('user_id');
             console.log('URL:', urlParams);
@@ -115,6 +114,9 @@
 
             // Флаг, указывающий, обрабатывается ли запрос
             let isProcessingRequest = false;
+
+            // Объявляем personCharacteristics глобально
+            let personCharacteristics; 
 
             // Инициализация Telegram Mini App
             tg.ready();
@@ -149,7 +151,7 @@
                     .then(stream => {
                         currentStream = stream;
                         initializeRecorder(stream);
-                        startSilenceDetection(stream, personCharacteristics);
+                        startSilenceDetection(stream);
                     })
                     .catch(error => {
                         console.error('Error accessing the microphone:', error);
@@ -161,7 +163,7 @@
             function endCall() {
                 isCallActive = false;
                 if (isRecording) {
-                    stopRecordingAndSend();
+                    stopRecordingAndSend(personCharacteristics); // Передаем характеристики
                 }
                 callButton.textContent = 'Начать звонок';
                 addMessage('Звонок завершен', 'system');
@@ -187,7 +189,7 @@
                 if (isCallActive && !isRecording && !isPlayingResponse) { 
                     console.log("Возобновляем прослушивание");
                     initializeRecorder(currentStream);
-                    startSilenceDetection(currentStream, personCharacteristics);
+                    startSilenceDetection(currentStream);
                 }
             }
 
@@ -219,11 +221,14 @@
                     console.log("Предыдущий запрос еще обрабатывается.");
                     return; 
                 }
-                console.log(personCharacteristics)
+
                 isProcessingRequest = true; 
                 const formData = new FormData();
                 formData.append('audio', audioBlob, 'recording.wav');
-                formData.append('characteristics', JSON.stringify(personCharacteristics));
+                // Проверяем, что personCharacteristics определены, прежде чем отправлять их
+                if (personCharacteristics) { 
+                    formData.append('characteristics', JSON.stringify(personCharacteristics));
+                }
 
                 if (userId) {
                     formData.append('telegram_user_id', userId);
@@ -445,7 +450,7 @@
                 }
             }
 
-            function startSilenceDetection(stream, personCharacteristics) {
+            function startSilenceDetection(stream) {
                 const audioContext = new AudioContext();
                 const analyser = audioContext.createAnalyser();
                 const microphone = audioContext.createMediaStreamSource(stream);
@@ -479,7 +484,7 @@
                         } else if (Date.now() - silenceStart > SILENCE_DURATION && !isPlayingResponse) { 
                             if (isRecording) {
                                 console.log("Обнаружена тишина, останавливаем запись");
-                                stopRecordingAndSend(personCharacteristics);
+                                stopRecordingAndSend(personCharacteristics); // Передаем характеристики
                                 silenceStart = null; 
                             }
                         }
