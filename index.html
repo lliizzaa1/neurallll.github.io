@@ -141,7 +141,7 @@
 
     @for $num from 1 through 8 {
       .circle:nth-child(#{$num}) {
-        left: ($num - 1) * 20px; 
+        left: ($num - 1) * 10px; 
         animation-delay: $num * .1s;
       }
     }
@@ -151,7 +151,7 @@
         transform: translateY(0);
       }
       50% {
-        transform: translateY(80px); /* Сдвигаем вниз на 10px */
+        transform: translateY(100px); /* Сдвигаем вниз на 10px */
       }
       100% {
         transform: translateY(0); 
