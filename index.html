@@ -489,12 +489,12 @@
                             }
                         }
                     } else {
-                        silenceStart = null; 
-                        if (!isRecording && !isPlayingResponse) { 
-                            console.log("Обнаружен звук, начинаем запись");
-                            startRecording();
+                        silenceStart = null;
+                        if (!isRecording && !isPlayingResponse) { // Добавляем проверку isPlayingResponse
+                          console.log("Обнаружен звук, начинаем запись");
+                          startRecording(); 
                         }
-                    }
+                      }
                 }
             
                 silenceDetectionInterval = setInterval(checkSilence, 100); 
