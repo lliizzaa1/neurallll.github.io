@@ -494,10 +494,15 @@
             ])
           };
 
-          const gender = getRandomElement(["man", "woman"]); // Выбор картинки
-          characteristics.gender = gender; 
+          let imageName;
+          if (characteristics["пол"] === "Мужской") {
+            imageName = 'man.png'; 
+          } else {
+            imageName = 'woman.png'; 
+          } 
 
-          callerImage.innerHTML = `<img src="${gender}.png" alt="${gender}">`; // Добавление картинки в HTML
+          callerImage.innerHTML = `<img src="${imageName}" alt="${characteristics["пол"]}">`; 
+
 
           return characteristics;
         }
