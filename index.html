@@ -10,9 +10,9 @@
     @font-face {
       font-family: 'SF Mono'; 
       src: local('SF Mono'), 
-           url('путь/к/вашему/шрифту/SF-Mono.woff2') format('woff2'), 
-           url('путь/к/вашему/шрифту/SF-Mono.woff') format('woff'), 
-           url('путь/к/вашему/шрифту/SF-Mono.ttf') format('truetype'); 
+           url('SF-Mono.woff2') format('woff2'), /* УКАЖИТЕ ПРАВИЛЬНЫЙ ПУТЬ */
+           url('SF-Mono.woff') format('woff'),     /* УКАЖИТЕ ПРАВИЛЬНЫЙ ПУТЬ */
+           url('SF-Mono.ttf') format('truetype');    /* УКАЖИТЕ ПРАВИЛЬНЫЙ ПУТЬ */
     }
 
     body {
@@ -116,10 +116,12 @@
           📶
         </span>
       </div>
+
       <div class="caller-info">
         <div class="caller-name">Клиент</div>
         <div class="call-duration">00:00</div>
       </div>
+
       <div class="call-button"> 
         <img src="call_start.png" alt="Начать звонок">  
       </div>
