@@ -354,6 +354,7 @@
           }
 
           try {
+            clearInterval(silenceDetectionInterval);
             console.log("Отправка аудио на сервер...");
             const response = await fetch('http://127.0.0.1:5000/recognize_speech', { 
               method: 'POST',
@@ -398,6 +399,7 @@
                 };
 
                 audio.onended = () => {
+                  startSilenceDetection(currentStream);
                   console.log("Воспроизведение аудио ответа завершено");
                   isPlayingResponse = false; 
                   resumeListening(); 
@@ -413,6 +415,7 @@
                 resumeListening(); 
               }
             } else {
+              startSilenceDetection(currentStream);
               console.log("Аудио данные отсутствуют в ответе сервера");
               resumeListening(); 
             }
