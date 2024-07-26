@@ -401,7 +401,7 @@
                 audio.onended = () => {
                     setTimeout(() => {
                         startSilenceDetection(currentStream); 
-                      }, 1500); 
+                      }, 10); 
                   console.log("Воспроизведение аудио ответа завершено");
                   isPlayingResponse = false; 
                   //resumeListening(); 
