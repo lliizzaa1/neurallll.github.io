@@ -241,7 +241,7 @@
             startTime = new Date();
             callTimer = setInterval(updateCallDuration, 1000);
           } else {
-            callEndSound.play();
+            //callEndSound.play();
             endCall();
             clearInterval(callTimer);
             callDuration.textContent = '00:00';
@@ -273,6 +273,7 @@
           callButton.style.backgroundColor = 'green';
           callButtonImg.src = 'call_start.png';
           addMessage('Звонок завершен', 'system');
+          callEndSound.play();
           logMessage('Call ended');
           if (tg.initData.query_id !== undefined) {
             tg.sendData(JSON.stringify({ action: 'endCall' }));
