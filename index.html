@@ -370,7 +370,9 @@
 
             const data = await response.json();
             console.log("Успешно получен ответ от сервера:", data);
-
+            if (data.callEnded) {
+                endCall(); // Вызываем функцию завершения звонка на фронтенде
+                return;}
             const requestIndex = audioRequests.findIndex(req => req.id === data.requestId);
             if (requestIndex !== -1) {
               console.log("Характеристики из запроса:", audioRequests[requestIndex].characteristics);
