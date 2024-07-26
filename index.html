@@ -402,7 +402,7 @@
                   startSilenceDetection(currentStream);
                   console.log("Воспроизведение аудио ответа завершено");
                   isPlayingResponse = false; 
-                  resumeListening(); 
+                  //resumeListening(); 
                 };
 
                 audio.onerror = (e) => {
@@ -417,7 +417,7 @@
             } else {
               startSilenceDetection(currentStream);
               console.log("Аудио данные отсутствуют в ответе сервера");
-              resumeListening(); 
+              //resumeListening(); 
             }
           } catch (error) {
             console.error('Ошибка отправки аудио на сервер:', error);
