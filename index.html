@@ -210,6 +210,9 @@
         const urlParams = new URLSearchParams(window.location.search);
         const userId = urlParams.get('user_id');
 
+        const callStartSound = new Audio('start_call.mp3'); // Путь к аудио с гудками начала
+        const callEndSound = new Audio('end_call.mp3');  
+
         const SILENCE_THRESHOLD = 1000; 
         let isProcessingRequest = false;
         let audioRequests = [];
@@ -233,10 +236,12 @@
 
         function toggleCall() {
           if (!isCallActive) {
+            callStartSound.play();
             startCall();
             startTime = new Date();
             callTimer = setInterval(updateCallDuration, 1000);
           } else {
+            callEndSound.play();
             endCall();
             clearInterval(callTimer);
             callDuration.textContent = '00:00';
