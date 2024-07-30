@@ -203,19 +203,18 @@
         let recorder;
         let audioBlob;
         let isRecording = false;
+        let isPlayingResponse = false; // Флаг проигрывания ответа
         let silenceTimer;
-        let isPlayingResponse = false;
+        let isProcessingRequest = false; // Флаг отправки запроса на сервер 
         let silenceDetectionInterval;
         let currentStream; 
         const urlParams = new URLSearchParams(window.location.search);
         const userId = urlParams.get('user_id');
 
-        const callStartSound = new Audio('start_call.mp3'); // Путь к аудио с гудками начала
+        const callStartSound = new Audio('start_call.mp3'); 
         const callEndSound = new Audio('end_call.mp3');  
 
         const SILENCE_THRESHOLD = 1000; 
-        let isProcessingRequest = false;
-        let audioRequests = [];
         let personCharacteristics; 
 
         tg.ready();
@@ -241,7 +240,6 @@
             startTime = new Date();
             callTimer = setInterval(updateCallDuration, 1000);
           } else {
-            //callEndSound.play();
             endCall();
             clearInterval(callTimer);
             callDuration.textContent = '00:00';
@@ -297,7 +295,7 @@
         }
 
         function resumeListening() {
-          if (isCallActive && !isRecording && !isPlayingResponse) { 
+          if (isCallActive && !isRecording && !isPlayingResponse && !isProcessingRequest) { 
             console.log("Возобновляем прослушивание");
             initializeRecorder(currentStream);
             startSilenceDetection(currentStream);
@@ -305,6 +303,10 @@
         }
 
         function startRecording() {
+          if (isPlayingResponse || isProcessingRequest) { 
+            console.log("Воспроизводится ответ или идет обработка, запись невозможна.");
+            return; 
+          }
           isRecording = true;
           recorder.startRecording();
           soundWave.classList.remove('microphone-muted'); 
@@ -334,14 +336,13 @@
             return; 
           }
 
-          isProcessingRequest = true; 
+          isProcessingRequest = true; // Блокируем запись на время обработки запроса 
           soundWave.classList.add('microphone-muted');
 
           const formData = new FormData();
           formData.append('audio', audioBlob, 'recording.wav');
 
           const requestId = Date.now();
-          audioRequests.push({ id: requestId, characteristics: personCharacteristics });
           formData.append('requestId', requestId);
 
           if (personCharacteristics) { 
@@ -373,13 +374,7 @@
             console.log("Успешно получен ответ от сервера:", data);
             if (data.callEnded) {
                 endCall(); // Вызываем функцию завершения звонка на фронтенде
-                return;}
-            const requestIndex = audioRequests.findIndex(req => req.id === data.requestId);
-            if (requestIndex !== -1) {
-              console.log("Характеристики из запроса:", audioRequests[requestIndex].characteristics);
-              audioRequests.splice(requestIndex, 1);
-            } else {
-              console.error("Запрос не найден:", data.requestId);
+                return;
             }
 
             if (data.audio_data) {
@@ -389,7 +384,7 @@
                 const audio = new Audio();
                 audio.src = data.audio_data;
 
-                isPlayingResponse = true; 
+                isPlayingResponse = true; // Блокируем запись на время проигрывания ответа
 
                 audio.oncanplaythrough = () => {
                   console.log("Аудио готово к воспроизведению");
@@ -428,7 +423,7 @@
             console.error('Ошибка отправки аудио на сервер:', error);
             resumeListening(); 
           } finally {
-            isProcessingRequest = false; 
+            isProcessingRequest = false; // Разблокируем запись после завершения обработки запроса
           }
         }        
 
