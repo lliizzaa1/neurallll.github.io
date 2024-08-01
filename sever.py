@@ -1,5 +1,5 @@
-from flask import Flask, jsonify, request, session, make_response
-from flask_cors import CORS
+from quart import Quart, jsonify, request, session, make_response, websocket
+from quart_cors import cors
 import logging
 import random
 from speech_recognition_mine import recognize_speech_from_file
@@ -7,22 +7,32 @@ import os
 import aiohttp
 import asyncio
 from dotenv import load_dotenv
-from gtts import gTTS
 import tempfile
 import uuid
-import pyttsx3
-import io
 import base64
 import wave
-from flask_cors import cross_origin
 import json
-from flask import render_template
-from aiogram import Bot
-from bot_instance import bot
+from quart import render_template_string
+from aiogram import Bot  # Вам может понадобиться другой способ запуска бота
+from bot_instance import bot  #  Убедитесь, что bot_instance работает с Quart
 import edge_tts
 from edge_tts import VoicesManager
 import requests
+import logging
+from quart import Response
+import gspread
+from google.oauth2.service_account import Credentials
+from datetime import datetime
 
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# Используйте logger.debug(), logger.info(), logger.error() вместо print() для лучшего логирования
+
+scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+creds = Credentials.from_service_account_file('credentials.json', scopes=scope)
+client = gspread.authorize(creds)
+products_sheet = client.open('НЕЙРОТРЕНЕР').sheet1
 
 
 clients = {
@@ -80,9 +90,6 @@ clients = {
     }
 
 async def send_end_call_message(bot: Bot, user_id: int, text: str, duration: int):
-    """Отправляет сообщение о завершении звонка пользователю в Telegram, 
-       разбивая длинные сообщения на части.
-    """
     try:
         MAX_MESSAGE_LENGTH = 4096
         
@@ -93,14 +100,15 @@ async def send_end_call_message(bot: Bot, user_id: int, text: str, duration: int
         for i, part in enumerate(text_parts):
             if i == 0:
                 await bot.send_message(user_id, header_text + part) 
-                print(f"Отправлена часть сообщения (с заголовком): {header_text + part}")  # Отладочная печать
+                print(f"Отправлена часть сообщения (с заголовком): {header_text + part}")
             else:
                 await bot.send_message(user_id, part)
-                print(f"Отправлена часть сообщения: {part}")  # Отладочная печать
+                print(f"Отправлена часть сообщения: {part}")
             
     except Exception as e:
         print(f"Ошибка при отправке сообщения в Telegram: {e}")
-    
+        # Можно добавить дополнительную обработку ошибок здесь
+
 
 semaphore = asyncio.Semaphore(50)
 
@@ -240,7 +248,7 @@ async def send_request(session, messages, max_retries=10, retry_delay=2, tempera
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
-app = Flask(__name__)
+app = Quart(__name__)
 app.secret_key = 'your_secret_key_here'  # Замените на свой секретный ключ
 #CORS(app, resources={r"/*": {"origins": "https://lliizzaa1.github.io"}}) #http://localhost:5000/
 origins = [
@@ -252,7 +260,7 @@ origins = [
 #cors = CORS(app, resources={r"/*": {"origins": origins}})
 #cors = CORS(app, resources={r"/*": {"origins": "https://lliizzaa1.github.io"}})
 #cors = CORS(app, resources={r"/*": {"origins": "https://lliizzaa1.github.io"}}, supports_credentials=True)
-cors = CORS(app, resources={r"/*": {"origins": ["https://lliizzaa1.github.io"]}})
+cors = cors(app, allow_origin=["https://lliizzaa1.github.io"])
 
 conversation_state = {
     "greeting_done": False,
@@ -267,25 +275,25 @@ def get_conversation_filename(telegram_user_id):
     return os.path.join('conversations', f'{telegram_user_id}.json')
 
 @app.route('/start_call', methods=['POST'])
-def start_call():
+async def start_call():
     """ Больше не нужен, так как мы используем Telegram User ID. 
         Можно удалить этот маршрут или оставить пустым, если он используется на фронтенде. 
     """
-    return jsonify({"message": "Call started"})
+    return await jsonify({"message": "Call started"})
 
 @app.route('/end_call', methods=['POST'])
-def end_call():
+async def end_call():
     """Завершает диалог."""
     user_id = session.pop('user_id', None)
     if not user_id:
-        return jsonify({"message": "No active call"}), 400
+        return await jsonify({"message": "No active call"}), 400
 
     # (опционально) удаление файла с историей диалога
     conversation_filename = get_conversation_filename(user_id)
     if os.path.exists(conversation_filename):
        os.remove(conversation_filename)
 
-    return jsonify({"message": "Call ended"})
+    return await jsonify({"message": "Call ended"})
 
 # @app.route('/delete_conversation', methods=['POST'])
 # async def delete_conversation(): # добавила async
@@ -305,71 +313,149 @@ def end_call():
 #         return jsonify({"message": "Conversation deleted"}), 200
 #     else:
 #         return jsonify({"message": "Conversation not found"}), 404
+import logging
 
 @app.route('/delete_conversation', methods=['POST'])
 async def delete_conversation():
-    telegram_user_id = request.form.get('telegram_user_id')
+    logging.info("Начало выполнения функции delete_conversation")
+    telegram_user_id = (await request.form).get('telegram_user_id') 
+    logging.info(f"Получен telegram_user_id: {telegram_user_id}")
     if not telegram_user_id:
-        return jsonify({"error": "Telegram User ID is missing"}), 400
+        logging.error("Telegram User ID отсутствует")
+        return await jsonify({"error": "Telegram User ID is missing"}), 400
 
     conversation_filename = get_conversation_filename(telegram_user_id)
+    logging.info(f"Имя файла для удаления: {conversation_filename}")
     try: 
         with open(conversation_filename, 'r', encoding='utf-8') as f:
             conversation_history = json.load(f)
+        logging.info("Файл успешно открыт и прочитан")
     except FileNotFoundError:
-        return jsonify({"message": "Conversation not found"}), 404
+        logging.error(f"Файл {conversation_filename} не найден")
+        return await jsonify({"message": "Conversation not found"}), 404
+    except json.JSONDecodeError:
+        logging.error(f"Ошибка декодирования JSON в файле {conversation_filename}")
+        return await jsonify({"message": "Error reading conversation file"}), 500
 
     conversation_history = format_conversation(conversation_history)
+    logging.info("История разговора отформатирована")
 
     # Получаем отчет асинхронно
     report = await get_report(conversation_history)
-    print(f"Получен отчет: {report}") 
+    logging.info(f"Получен отчет: {report}")
 
-    # Вместо отправки сообщения вызываем /send_report
-    response = requests.post(f"http://127.0.0.1:5000/send_report", 
-                             data={'telegram_user_id': telegram_user_id})
-    if response.status_code == 200:
-        print("Запрос на отправку отчета успешно отправлен")
-    else:
-        print(f"Ошибка при отправке запроса на отправку отчета: {response.text}")
+    # Отправляем отчет в Telegram
+    try:
+        await send_end_call_message(bot, int(telegram_user_id), report, 0)
+        logging.info("Отчет успешно отправлен в Telegram")
+    except Exception as e:
+        logging.error(f"Ошибка при отправке отчета в Telegram: {str(e)}")
 
+    # Удаляем файл
     if os.path.exists(conversation_filename):
-        os.remove(conversation_filename)
-        return jsonify({"message": "Conversation deleted"}), 200
+        try:
+            os.remove(conversation_filename)
+            logging.info(f"Файл {conversation_filename} успешно удален")
+        except Exception as e:
+            logging.error(f"Ошибка при удалении файла {conversation_filename}: {str(e)}")
+        return Response(json.dumps({"message": "Conversation deleted"}), status=200, mimetype='application/json')
+
     else:
-        return jsonify({"message": "Conversation not found"}), 404
+        logging.warning(f"Файл {conversation_filename} не существует")
+        return Response(json.dumps({"message": "Conversation not found"}), status=404, mimetype='application/json')
+
+
+# @app.route('/delete_conversation', methods=['POST'])
+# async def delete_conversation():
+#     telegram_user_id = (await request.form).get('telegram_user_id') 
+#     if not telegram_user_id:
+#         return await jsonify({"error": "Telegram User ID is missing"}), 400
+
+#     conversation_filename = get_conversation_filename(telegram_user_id)
+#     try: 
+#         with open(conversation_filename, 'r', encoding='utf-8') as f:
+#             conversation_history = json.load(f)
+#     except FileNotFoundError:
+#         return await jsonify({"message": "Conversation not found"}), 404
+
+#     conversation_history = format_conversation(conversation_history)
+
+#     # Получаем отчет асинхронно
+#     report = await get_report(conversation_history)
+#     print(f"Получен отчет: {report}") 
+
+#     # Вместо отправки сообщения вызываем /send_report
+#     response = requests.post(f"http://127.0.0.1:5000/send_report", 
+#                              data={'telegram_user_id': telegram_user_id})
+#     if response.status_code == 200:
+#         print("Запрос на отправку отчета успешно отправлен")
+#     else:
+#         print(f"Ошибка при отправке запроса на отправку отчета: {response.text}")
+
+#     if os.path.exists(conversation_filename):
+#         os.remove(conversation_filename)
+#         return await jsonify({"message": "Conversation deleted"}), 200
+#     else:
+#         return await jsonify({"message": "Conversation not found"}), 404
 
 @app.route('/test', methods=['GET'])
-def test():
+async def test():
     logging.info("Test endpoint called")
-    return jsonify({"message": "Server is working!"})
+    return await jsonify({"message": "Server is working!"})
+
+# @app.route('/send_report', methods=['POST'])
+# async def send_report():
+#     telegram_user_id = request.form.get('telegram_user_id')
+#     if not telegram_user_id:
+#         return jsonify({"error": "Telegram User ID is missing"}), 400
+
+#     conversation_filename = get_conversation_filename(telegram_user_id)
+#     try: 
+#         with open(conversation_filename, 'r', encoding='utf-8') as f:
+#             conversation_history = json.load(f)
+#     except FileNotFoundError:
+#         return jsonify({"message": "Conversation not found"}), 404
+
+#     conversation_history = format_conversation(conversation_history)
+
+#     report = await get_report(conversation_history)
+#     print(f"Получен отчет: {report}")
+
+#     try:
+#         asyncio.run(send_end_call_message(bot, int(telegram_user_id), report, 0))
+#         print("Отчет отправлен в Telegram")
+#         return jsonify({"message": "Report sent successfully"}), 200
+#     except Exception as e:
+#         print(f"Ошибка при отправке отчета в Telegram: {e}")
+#         return jsonify({"error": f"Error sending report: {e}"}), 500
+
+from quart import current_app
 
 @app.route('/send_report', methods=['POST'])
 async def send_report():
     telegram_user_id = request.form.get('telegram_user_id')
     if not telegram_user_id:
-        return jsonify({"error": "Telegram User ID is missing"}), 400
+        return await jsonify({"error": "Telegram User ID is missing"}), 400
 
     conversation_filename = get_conversation_filename(telegram_user_id)
     try: 
         with open(conversation_filename, 'r', encoding='utf-8') as f:
             conversation_history = json.load(f)
     except FileNotFoundError:
-        return jsonify({"message": "Conversation not found"}), 404
+        return await jsonify({"message": "Conversation not found"}), 404
 
     conversation_history = format_conversation(conversation_history)
 
     report = await get_report(conversation_history)
     print(f"Получен отчет: {report}")
 
-    try:
-        await send_end_call_message(bot, int(telegram_user_id), report, 0)
-        print("Отчет отправлен в Telegram")
-        return jsonify({"message": "Report sent successfully"}), 200
-    except Exception as e:
-        print(f"Ошибка при отправке отчета в Telegram: {e}")
-        return jsonify({"error": f"Error sending report: {e}"}), 500
+    # Создаем задачу для отправки сообщения
+    send_message_task = asyncio.ensure_future(send_end_call_message(bot, int(telegram_user_id), report, 0))
 
+    # Ожидаем завершения задачи
+    await asyncio.gather(send_message_task)
+
+    return await jsonify({"message": "Report sent successfully"}), 200
 # def generate_audio(text):
 #   print("Генерирую речь...")
 #   tts = gTTS(text=text, lang='ru') 
@@ -427,13 +513,13 @@ async def handle_speech():
     """Обрабатывает речь пользователя, получает ответ бота 
        и сохраняет историю диалога в файл, используя Telegram User ID.
     """
-    if 'audio' not in request.files:
-        return jsonify({"error": "No audio file provided"}), 400
+    if 'audio' not in (await request.files):
+        return await jsonify({"error": "No audio file provided"}), 400
 
-    audio_file = request.files['audio']
-    telegram_user_id = request.form.get('telegram_user_id')  # Получаем Telegram User ID из FormData
-    request_id = int(request.form.get('requestId'))
-    person_characteristics = request.form.get('characteristics')
+    audio_file = (await request.files)['audio']
+    telegram_user_id = (await request.form).get('telegram_user_id')  # Получаем Telegram User ID из FormData
+    request_id = int((await request.form).get('requestId'))
+    person_characteristics = (await request.form).get('characteristics')
     print(type(person_characteristics))
     print("Получены характеристики:", person_characteristics) 
     client_data_dict = json.loads(person_characteristics)
@@ -444,15 +530,15 @@ async def handle_speech():
     
 
     if audio_file.filename == '':
-        return jsonify({"error": "No selected file"}), 400
+        return await jsonify({"error": "No selected file"}), 400
 
     if not telegram_user_id:
-        return jsonify({"error": "Telegram User ID is missing"}), 400
+        return await jsonify({"error": "Telegram User ID is missing"}), 400
 
     if audio_file:
-        user_speech = recognize_speech_from_file(audio_file)
+        user_speech = await recognize_speech_from_file(audio_file)
         if user_speech is None:
-            return jsonify({"error": "Ошибка распознавания речи"}), 500
+            return Response(json.dumps({"error": "Ошибка распознавания речи"}), status=500, mimetype='application/json')
 
         conversation_filename = get_conversation_filename(telegram_user_id)
         try:
@@ -489,25 +575,34 @@ async def handle_speech():
         audio_data = await generate_audio(bot_response, gender=client_gender)
         audio_data_base64 = base64.b64encode(audio_data).decode('utf-8')
 
-        response = make_response(jsonify({
+        response = await make_response(jsonify({
             "user_speech": user_speech,
             "bot_response": bot_response,
             "audio_data": f"data:audio/wav;base64,{audio_data_base64}",
             "requestId": request_id 
         }))
 
-        response.headers['Access-Control-Allow-Origin'] = '*'
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
-        response.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
+        #response.headers['Access-Control-Allow-Origin'] = '*'
+        #response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
+        #response.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
         #response.headers['Access-Control-Allow-Credentials'] = 'true'
 
         return response, 200
 
-    return jsonify({"error": "Invalid file"}), 400
+    return await jsonify({"error": "Invalid file"}), 400
 
 @app.route('/')
-def index():
-    return render_template('index.html')
+async def index():
+    # Используйте render_template_string для Quart
+    return await render_template_string('index.html') 
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+import asyncio
+from hypercorn.config import Config
+from hypercorn.asyncio import serve
+
+if __name__ == "__main__":
+    config = Config()
+    config.bind = ["0.0.0.0:5000"]
+    config.use_reloader = True
+    asyncio.run(serve(app, config))
+
