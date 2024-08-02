@@ -388,7 +388,7 @@
 
                 audio.oncanplaythrough = () => {
                   console.log("Аудио готово к воспроизведению");
-                  audio.playbackRate = 2;
+                  audio.playbackRate = 1.75;
                   audio.play().catch(error => {
                     console.error("Ошибка воспроизведения аудио:", error);
                     isPlayingResponse = false; 
@@ -501,7 +501,8 @@
         async function deleteConversation() {
           const formData = new FormData();
           formData.append('telegram_user_id', userId); 
-
+          const callDurationSeconds = Math.floor((new Date() - startTime) / 1000); //  Получаем длительность в секундах
+          formData.append('call_duration', callDurationSeconds); 
           try {
             const response = await fetch('http://127.0.0.1:5000/delete_conversation', {
               method: 'POST',
