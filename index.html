@@ -336,6 +336,12 @@
             return; 
           }
 
+          if (audioBlob.size < 1000) {  // Проверяем размер файла
+            console.log("Файл слишком маленький, пропуск отправки:", audioBlob.size, "байт");
+            resumeListening(); 
+            return;
+          }
+
           isProcessingRequest = true; // Блокируем запись на время обработки запроса 
           soundWave.classList.add('microphone-muted');
 
