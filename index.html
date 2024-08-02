@@ -158,7 +158,12 @@
       background-color: #D3D3D3; 
       animation-play-state: paused;
     }
-    
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
   </style>
 </head>
 <body>
@@ -175,7 +180,9 @@
       <div class="caller-info">
         <div class="caller-name">Клиент</div>
         <div class="call-duration">00:00</div> 
-        <div class="caller-image"></div> 
+        <div class="caller-image">
+          <img id="cyborg-icon" src="cyborg.png" alt="cyborg"> 
+        </div> 
       </div>
 
       <div class="sound-wave-container">
@@ -203,9 +210,9 @@
         let recorder;
         let audioBlob;
         let isRecording = false;
-        let isPlayingResponse = false; // Флаг проигрывания ответа
+        let isPlayingResponse = false;
         let silenceTimer;
-        let isProcessingRequest = false; // Флаг отправки запроса на сервер 
+        let isProcessingRequest = false; 
         let silenceDetectionInterval;
         let currentStream; 
         const urlParams = new URLSearchParams(window.location.search);
@@ -248,6 +255,9 @@
         }
 
         async function startCall() {
+          // Сбрасываем анимацию при начале звонка
+          document.getElementById('cyborg-icon').style.animation = 'none';
+          
           callButton.style.backgroundColor = 'red'; 
           callButtonImg.src = 'call_end.png'; 
           addMessage('Звонок начат', 'system');
@@ -336,13 +346,13 @@
             return; 
           }
 
-          if (audioBlob.size < 1000) {  // Проверяем размер файла
+          if (audioBlob.size < 1000) {  
             console.log("Файл слишком маленький, пропуск отправки:", audioBlob.size, "байт");
             resumeListening(); 
             return;
           }
 
-          isProcessingRequest = true; // Блокируем запись на время обработки запроса 
+          isProcessingRequest = true; 
           soundWave.classList.add('microphone-muted');
 
           const formData = new FormData();
@@ -362,6 +372,9 @@
           }
 
           try {
+            // Запускаем анимацию пульсации
+            document.getElementById('cyborg-icon').style.animation = 'pulse 1s infinite';
+
             clearInterval(silenceDetectionInterval);
             console.log("Отправка аудио на сервер...");
             const response = await fetch('http://127.0.0.1:5000/recognize_speech', { 
@@ -379,7 +392,7 @@
             const data = await response.json();
             console.log("Успешно получен ответ от сервера:", data);
             if (data.callEnded) {
-                endCall(); // Вызываем функцию завершения звонка на фронтенде
+                endCall();
                 return;
             }
 
@@ -390,7 +403,7 @@
                 const audio = new Audio();
                 audio.src = data.audio_data;
 
-                isPlayingResponse = true; // Блокируем запись на время проигрывания ответа
+                isPlayingResponse = true; 
 
                 audio.oncanplaythrough = () => {
                   console.log("Аудио готово к воспроизведению");
@@ -429,7 +442,9 @@
             console.error('Ошибка отправки аудио на сервер:', error);
             resumeListening(); 
           } finally {
-            isProcessingRequest = false; // Разблокируем запись после завершения обработки запроса
+            isProcessingRequest = false; 
+            // Останавливаем анимацию после получения ответа 
+            document.getElementById('cyborg-icon').style.animation = 'none';
           }
         }        
 
@@ -496,18 +511,13 @@
             ]),
           };
 
-          const gender = getRandomElement(["man", "woman"]); 
-          characteristics.gender = gender; 
-
-          callerImage.innerHTML = `<img src="${gender}.png" alt="${gender}">`;
-
           return characteristics;
         }
 
         async function deleteConversation() {
           const formData = new FormData();
           formData.append('telegram_user_id', userId); 
-          const callDurationSeconds = Math.floor((new Date() - startTime) / 1000); //  Получаем длительность в секундах
+          const callDurationSeconds = Math.floor((new Date() - startTime) / 1000); 
           formData.append('call_duration', callDurationSeconds); 
           try {
             const response = await fetch('http://127.0.0.1:5000/delete_conversation', {
