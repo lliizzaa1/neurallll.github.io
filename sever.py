@@ -35,6 +35,26 @@ client = gspread.authorize(creds)
 products_sheet = client.open('НЕЙРОТРЕНЕР').sheet1
 
 
+def get_user_name(user_id):
+    """Ищет Telegram User ID в таблице "Доступ_нейротренер" 
+       и возвращает имя и фамилию пользователя.
+    """
+    try:
+        sheet = client.open('Доступ_нейротренер')
+        white_list_sheet = sheet.get_worksheet(0)
+        cell = white_list_sheet.find(str(user_id), in_column=2)  # Ищем ID во втором столбце
+        if cell:
+            row = cell.row
+            first_name = white_list_sheet.cell(row, 1).value  # Имя в первом столбце
+            last_name = white_list_sheet.cell(row, 3).value  # Фамилия в третьем столбце
+            return f"{first_name} {last_name}" 
+        else:
+            return "Неизвестный пользователь"
+    except Exception as e:
+        print(f"Ошибка при получении имени пользователя: {e}")
+        return "Ошибка при получении имени"
+
+
 clients = {
     "1": "Психологический портрет: Циничный, недоверчивый, видит мир полным обмана. Считает финансы \"игрой для богатых\". Склонен к конспирологии, верит в \"скрытые схемы\".\nПоведение в разговоре: Негатив на предложения, агрессия, сарказм, обвинения, угрозы.\nОнлайн-коммуникация: Много восклицательных знаков, риторических вопросов, негативно окрашенных слов (\"обман\", \"ложь\"). Хаотичный, эмоциональный текст, переходы на личности.\nДлина ответов: Короткие, резкие, обрывочные.\nВероятность сброса: Высокая, если не перевести диалог в конструктивное русло.\nСклонность к диалогу: Низкая, склонен к монологу, обвинениям, перебиванию.\n\"Болевые точки\": Любые упоминания о возможных рисках, неудачах, отсутствие 100% гарантий.\nДлина предложений: Короткие, часто незаконченные.\nСтиль речи: Агрессивный, эмоциональный, может использовать сарказм, иронию, сленг с негативной окраской.\nИспользование жаргонизмов: Возможны грубые и вульгарные выражения.\nИспользование нецензурной брани: Высокая вероятность, особенно при эскалации конфликта.",
     "2": "Психологический портрет: Тревожный, опасается потерь, не доверяет. Стремится к контролю, тщательно анализирует, боится ошибиться.\nПоведение в разговоре: Много уточняющих вопросов, проверяет детали, переспрашивает.\nОнлайн-коммуникация: Много вопросов, уточнений, просьб повторить/разъяснить. Слова \"точно\", \"гарантированно\", \"документально\". Длинный, запутанный текст с повторами.\nДлина ответов: Зависит от полноты информации, от кратких до развернутых.\nВероятность сброса: Низкая, пока есть ответы на вопросы и успокоение опасений.\nСклонность к диалогу: Средняя, задает много вопросов, но может быстро потерять интерес, если не получает исчерпывающей информации.\n\"Болевые точки\": Неопределённость, нехватка информации, отсутствие четких гарантий и доказательств.\nДлина предложений: Средние и длинные, с многочисленными уточнениями и придаточными предложениями.\nСтиль речи: Формальный, деловой, с использованием терминов, цифр, ссылок на законы, документы.\nИспользование жаргонизмов: Маловероятно.\nИспользование нецензурной брани: Практически исключено.",
@@ -154,7 +174,7 @@ async def get_response(conversation_history, person_characteristics=None, client
     }
     
     messages = [system_message] + conversation_history
-    print(messages)
+    #print(messages)
     async with aiohttp.ClientSession() as session:
         response_json = await send_request(session, messages, temperature=0.7)
         
@@ -174,7 +194,6 @@ async def get_report(communication, duration=0, start_call=0):
                 Встреча назначена. Ошибок нет 🟢
                 Встреча не назначена. Есть ошибки 🔴
                 Встреча не назначена. Ошибок нет 🟢
-                📆 Начало звонка: [дата и время] {start_call}
                 ⏳ Длительность: [в секундах или в формате "минуты:секунды" если больше 60 секунд] {duration}
                 ✍️ Транскрипция по ролям: [полная расшифровка диалога]
                 💡 Обратная связь
@@ -195,9 +214,9 @@ async def get_report(communication, duration=0, start_call=0):
     }
     
     messages = [system_message]
-    print('########################################################')
-    print(messages)
-    print('########################################################')
+    #print('########################################################')
+    #print(messages)
+    #print('########################################################')
     async with aiohttp.ClientSession() as session:
         response_json = await send_request(session, messages)
         
@@ -235,7 +254,7 @@ async def send_request(session, messages, max_retries=10, retry_delay=2, tempera
                         return response_json
                     else:
                         error_message = f"API request failed with status {response.status}: {response.reason}"
-                        print(error_message)  # Или запишите в лог
+                        #print(error_message)  # Или запишите в лог
         except Exception as e:
             print(f"Error in send_request: {str(e)}")  # Или запишите в лог
 
@@ -295,30 +314,18 @@ async def end_call():
 
     return await jsonify({"message": "Call ended"})
 
-# @app.route('/delete_conversation', methods=['POST'])
-# async def delete_conversation(): # добавила async
-#     telegram_user_id = request.form.get('telegram_user_id')
-#     if not telegram_user_id:
-#         return jsonify({"error": "Telegram User ID is missing"}), 400
 
-#     conversation_filename = get_conversation_filename(telegram_user_id)
-#     with open(conversation_filename, 'r', encoding='utf-8') as f:
-#                 conversation_history = json.load(f)
-#     print(conversation_history)
-#     conversation_history = format_conversation(conversation_history)
-#     conversation_history = await get_report(conversation_history)
-#     await send_end_call_message(bot=bot, user_id=telegram_user_id, text=conversation_history, duration=0)
-#     if os.path.exists(conversation_filename):
-#         os.remove(conversation_filename)
-#         return jsonify({"message": "Conversation deleted"}), 200
-#     else:
-#         return jsonify({"message": "Conversation not found"}), 404
 import logging
 
 @app.route('/delete_conversation', methods=['POST'])
 async def delete_conversation():
     logging.info("Начало выполнения функции delete_conversation")
     telegram_user_id = (await request.form).get('telegram_user_id') 
+    call_duration = (await request.form).get('call_duration')  
+    try:
+        call_duration = int(call_duration)  # Преобразуем в число
+    except (TypeError, ValueError):
+        call_duration = 0
     logging.info(f"Получен telegram_user_id: {telegram_user_id}")
     if not telegram_user_id:
         logging.error("Telegram User ID отсутствует")
@@ -341,15 +348,17 @@ async def delete_conversation():
     logging.info("История разговора отформатирована")
 
     # Получаем отчет асинхронно
-    report = await get_report(conversation_history)
+    report = await get_report(conversation_history, duration=call_duration)
     logging.info(f"Получен отчет: {report}")
-
+    await save_conversation(telegram_user_id, report, call_duration)
     # Отправляем отчет в Telegram
     try:
         await send_end_call_message(bot, int(telegram_user_id), report, 0)
         logging.info("Отчет успешно отправлен в Telegram")
     except Exception as e:
         logging.error(f"Ошибка при отправке отчета в Telegram: {str(e)}")
+
+    user_name = get_user_name(telegram_user_id)
 
     # Удаляем файл
     if os.path.exists(conversation_filename):
@@ -364,76 +373,69 @@ async def delete_conversation():
         logging.warning(f"Файл {conversation_filename} не существует")
         return Response(json.dumps({"message": "Conversation not found"}), status=404, mimetype='application/json')
 
+CONVERSATIONS_DATA = {}
+DATA_FILE = "conversations_data.json"  # Имя файла для хранения данных
 
-# @app.route('/delete_conversation', methods=['POST'])
-# async def delete_conversation():
-#     telegram_user_id = (await request.form).get('telegram_user_id') 
-#     if not telegram_user_id:
-#         return await jsonify({"error": "Telegram User ID is missing"}), 400
+def load_conversations_data():
+    """Загружает данные из JSON-файла."""
+    global CONVERSATIONS_DATA  # Добавляем global сюда
+    try:
+        with open(DATA_FILE, 'r', encoding='utf-8') as f:
+            CONVERSATIONS_DATA = json.load(f)
+    except FileNotFoundError:
+        CONVERSATIONS_DATA = {}
 
-#     conversation_filename = get_conversation_filename(telegram_user_id)
-#     try: 
-#         with open(conversation_filename, 'r', encoding='utf-8') as f:
-#             conversation_history = json.load(f)
-#     except FileNotFoundError:
-#         return await jsonify({"message": "Conversation not found"}), 404
+def save_conversations_data():
+    """Сохраняет данные в JSON-файл."""
+    global CONVERSATIONS_DATA  # И сюда тоже
+    with open(DATA_FILE, 'w', encoding='utf-8') as f:
+        json.dump(CONVERSATIONS_DATA, f, indent=4, ensure_ascii=False)
 
-#     conversation_history = format_conversation(conversation_history)
+def get_user_name(user_id):
+    """Возвращает имя пользователя Telegram (пока заглушка)."""
+    # TODO: реализовать получение имени пользователя из Telegram
+    return f"Пользователь {user_id}"
 
-#     # Получаем отчет асинхронно
-#     report = await get_report(conversation_history)
-#     print(f"Получен отчет: {report}") 
+async def save_conversation(user_id, report, duration):
+    """Сохраняет информацию о звонке в JSON-формате."""
+    global CONVERSATIONS_DATA  
+    try: 
+        load_conversations_data()  # Загружаем данные
 
-#     # Вместо отправки сообщения вызываем /send_report
-#     response = requests.post(f"http://127.0.0.1:5000/send_report", 
-#                              data={'telegram_user_id': telegram_user_id})
-#     if response.status_code == 200:
-#         print("Запрос на отправку отчета успешно отправлен")
-#     else:
-#         print(f"Ошибка при отправке запроса на отправку отчета: {response.text}")
+        user_id = str(user_id) 
+        user_name = get_user_name(user_id)
+        end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-#     if os.path.exists(conversation_filename):
-#         os.remove(conversation_filename)
-#         return await jsonify({"message": "Conversation deleted"}), 200
-#     else:
-#         return await jsonify({"message": "Conversation not found"}), 404
+        conversation_data = {
+            "user_name": user_name,
+            "report": report,
+            "end_time": end_time,
+            "duration": duration
+        }
+
+        if user_id in CONVERSATIONS_DATA:
+            CONVERSATIONS_DATA[user_id].append(conversation_data)
+        else:
+            CONVERSATIONS_DATA[user_id] = [conversation_data]
+
+    except Exception as e:
+        print(f"Ошибка при сохранении данных о разговоре: {e}")
+    finally:
+        save_conversations_data()  # Сохраняем данные в файл
 
 @app.route('/test', methods=['GET'])
 async def test():
     logging.info("Test endpoint called")
     return await jsonify({"message": "Server is working!"})
 
-# @app.route('/send_report', methods=['POST'])
-# async def send_report():
-#     telegram_user_id = request.form.get('telegram_user_id')
-#     if not telegram_user_id:
-#         return jsonify({"error": "Telegram User ID is missing"}), 400
-
-#     conversation_filename = get_conversation_filename(telegram_user_id)
-#     try: 
-#         with open(conversation_filename, 'r', encoding='utf-8') as f:
-#             conversation_history = json.load(f)
-#     except FileNotFoundError:
-#         return jsonify({"message": "Conversation not found"}), 404
-
-#     conversation_history = format_conversation(conversation_history)
-
-#     report = await get_report(conversation_history)
-#     print(f"Получен отчет: {report}")
-
-#     try:
-#         asyncio.run(send_end_call_message(bot, int(telegram_user_id), report, 0))
-#         print("Отчет отправлен в Telegram")
-#         return jsonify({"message": "Report sent successfully"}), 200
-#     except Exception as e:
-#         print(f"Ошибка при отправке отчета в Telegram: {e}")
-#         return jsonify({"error": f"Error sending report: {e}"}), 500
 
 from quart import current_app
 
 @app.route('/send_report', methods=['POST'])
 async def send_report():
+    print('ОТЧЕТИК')
     telegram_user_id = request.form.get('telegram_user_id')
+    print('IDDDD:', telegram_user_id)
     if not telegram_user_id:
         return await jsonify({"error": "Telegram User ID is missing"}), 400
 
@@ -454,8 +456,23 @@ async def send_report():
 
     # Ожидаем завершения задачи
     await asyncio.gather(send_message_task)
+    user_name = get_user_name(telegram_user_id)
+
+    # Записываем данные в таблицу "НЕЙРОТРЕНЕР"
+    try:
+        sheet = client.open('НЕЙРОТРЕНЕР')
+        worksheet = sheet.get_worksheet(0)  # Выбираем первый лист
+
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        row = [timestamp, user_name, report] #  Добавляем call_duration 
+        worksheet.append_row(row)
+
+    except Exception as e:
+        print(f"Ошибка при записи в Google Sheets: {e}")                                    # Отчет
+
 
     return await jsonify({"message": "Report sent successfully"}), 200
+
 # def generate_audio(text):
 #   print("Генерирую речь...")
 #   tts = gTTS(text=text, lang='ru') 
@@ -551,7 +568,10 @@ async def handle_speech():
 
         # Получение ответа от бота
         bot_response = await get_response(conversation_history, person_characteristics, client_type)
-        print('_______________________', bot_response)
+        #print('_______________________', bot_response)
+        conversation_history.append({"role": "assistant", "content": bot_response})
+        with open(conversation_filename, 'w', encoding='utf-8') as f:
+            json.dump(conversation_history, f, indent=4, ensure_ascii=False)
         if bot_response.strip().upper() == "СБРОС" or "СБРОС" in bot_response.strip().upper():
             #  Выполняем действия по завершению звонка 
 
