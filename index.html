@@ -341,70 +341,75 @@
         }
 
         async function sendAudioToServer(audioBlob, personCharacteristics) {
-          if (isProcessingRequest) { 
-            console.log("Предыдущий запрос еще обрабатывается.");
+          // Проверка audioBlob перед созданием FormData
+          if (!audioBlob || audioBlob.size === 0 || !audioBlob.type.startsWith('audio/')) {
+            console.error('Некорректный объект audioBlob:', audioBlob);
+            resumeListening();
             return; 
           }
-
-          if (audioBlob.size < 1000) {  
-            console.log("Файл слишком маленький, пропуск отправки:", audioBlob.size, "байт");
-            resumeListening(); 
-            return;
-          }
-
-          isProcessingRequest = true; 
-          soundWave.classList.add('microphone-muted');
-
+        
           const formData = new FormData();
           formData.append('audio', audioBlob, 'recording.wav');
-
+        
           const requestId = Date.now();
           formData.append('requestId', requestId);
-
+        
           if (personCharacteristics) { 
             formData.append('characteristics', JSON.stringify(personCharacteristics));
           }
-
+        
           if (userId) {
             formData.append('telegram_user_id', userId);
           } else {
             console.error("Ошибка: userId не определен");
           }
-
+        
+          // Создание AbortController для управления запросом
+          const controller = new AbortController();
+          const signal = controller.signal;
+        
+          // Установка таймаута для запроса (например, 5 секунд)
+          const timeoutId = setTimeout(() => controller.abort(), 5000);
+        
           try {
             // Запускаем анимацию пульсации
             document.getElementById('cyborg-icon').style.animation = 'pulse 1s infinite';
-
+        
             clearInterval(silenceDetectionInterval);
             console.log("Отправка аудио на сервер...");
+            // Отправка запроса с использованием fetch и AbortController
             const response = await fetch('http://127.0.0.1:5000/recognize_speech', { 
               method: 'POST',
-              body: formData
+              body: formData,
+              signal: signal // Передача сигнала в запрос
             });
-
+        
             console.log("Получен ответ от сервера. Статус:", response.status);
-
+        
+            // Очистка таймаута, если запрос завершился успешно
+            clearTimeout(timeoutId);
+        
             if (!response.ok) {
               const errorText = await response.text();
               throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
             }
-
+        
             const data = await response.json();
             console.log("Успешно получен ответ от сервера:", data);
             if (data.callEnded) {
                 endCall();
                 return;
             }
-
+        
             if (data.audio_data) {
               try {
                 console.log("Попытка воспроизведения аудио ответа...");
-
+        
                 const audio = new Audio();
                 audio.src = data.audio_data;
-
+        
                 isPlayingResponse = true; 
-
+        
                 audio.oncanplaythrough = () => {
                   console.log("Аудио готово к воспроизведению");
                   audio.playbackRate = 1.75;
@@ -414,7 +419,7 @@
                     resumeListening(); 
                   });
                 };
-
+        
                 audio.onended = () => {
                     setTimeout(() => {
                         startSilenceDetection(currentStream); 
@@ -423,7 +428,7 @@
                   isPlayingResponse = false; 
                   resumeListening(); 
                 };
-
+        
                 audio.onerror = (e) => {
                   console.error("Ошибка загрузки аудио:", e);
                   isPlayingResponse = false; 
@@ -439,14 +444,24 @@
               //resumeListening(); 
             }
           } catch (error) {
-            console.error('Ошибка отправки аудио на сервер:', error);
-            resumeListening(); 
+            // Обработка ошибки таймаута
+            if (error.name === 'AbortError') {
+              console.error('Запрос был прерван по таймауту.');
+            } else {
+              console.error('Ошибка отправки аудио на сервер:', error);
+            }
           } finally {
-            isProcessingRequest = false; 
+            isProcessingRequest = false;
+            // Сброс флагов после отправки запроса
+            isRecording = false;
+            silenceStart = null;
+        
             // Останавливаем анимацию после получения ответа 
             document.getElementById('cyborg-icon').style.animation = 'none';
           }
-        }        
+        }
+
+                
 
         function addMessage(message, type) {
           
