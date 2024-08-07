@@ -242,25 +242,30 @@
 
         function toggleCall() {
           if (!isCallActive) {
+            // Запускаем гудки
             callStartSound.play();
         
             // Определяем пол клиента для выбора аудио
             const gender = personCharacteristics ? personCharacteristics.пол : "Мужской";
         
             // Используем "male" или "female" в зависимости от пола
-            const genderString = gender === "Мужской" ? "male" : "female"; 
+            const genderString = gender === "Мужской" ? "male" : "female";
         
             // Выбираем случайное аудио
             const audioNumber = getRandomInt(1, 3);
             const greetingAudio = new Audio(`start_${genderString}_${audioNumber}.mp3`);
         
-            // Проигрываем приветствие после завершения гудков
+            // Проигрываем приветствие ПОСЛЕ окончания гудков
+            callStartSound.onended = () => { 
+              greetingAudio.play();
+            };
+        
+            // Запускаем startCall после окончания приветствия
             greetingAudio.onended = () => {
               startCall();
               startTime = new Date();
               callTimer = setInterval(updateCallDuration, 1000);
             };
-            greetingAudio.play();
         
           } else {
             endCall();
